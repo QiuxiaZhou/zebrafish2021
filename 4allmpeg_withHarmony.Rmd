@@ -1,0 +1,461 @@
+---
+title: "Seurat_Code_LD_2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+
+```{r}
+#install.packages("BiocManager")
+
+#BiocManager::install("Seurat")
+#BiocManager::install("ggplot2")
+#BiocManager::install("sctransform")
+#install.packages('devtools')
+library(devtools)
+#devtools::install_github("immunogenomics/harmony")
+
+library(harmony)
+library(Seurat)
+library(ggplot2)
+library(sctransform)
+library(dplyr)
+library(ape)
+library(variancePartition)
+library(cowplot)
+library(Matrix)
+
+#find out where you are
+getwd()
+dir= "/Users/whippoorwill/Desktop/Sequencing/Nick/2_2020"
+ #set this to whatever you like, above the level of your data folder
+#setwd(dir)
+```
+
+```{r}
+load("/Users/whippoorwill/Desktop/Sequencing/Nick/2_2020/Graphs_Analysis_August2020 mpeg only/Data/Nick_mpegonly_umap.RData")
+
+sobject = subset(sobject,subset = sample_description == "Adult B")
+save(sobject,file = "/Users/whippoorwill/Desktop/Sequencing/Nick/2_2020/Graphs_Analysis_August2020 mpeg only/Data/mpeg_adult.RData")
+```
+
+```{r}
+load("/Users/whippoorwill/Desktop/Sequencing/Nick/2_2020/Graphs_Analysis_August2020 mpeg only/Data/mpeg_adult.RData")
+adult = sobject
+load("/Users/whippoorwill/Desktop/Sequencing/Nick/2_2020/Graphs_Analysis_August2020 mpeg only/Data/mpeg_juvenile.RData")
+juvenile = sobject
+```
+
+```{r}
+sobject = merge(adult,juvenile)
+table(sobject$sample_description)
+```
+
+
+
+Normalize the data - counts per 10k - set by the "scale.factor". Raw data has the original data; the data slot has the filtered data (from above); the normalization will work on the raw data but only pulls the cells that are included in your filtered "data" and store the normalization as data (NOT the scale data slot) - so it isn't working on the filtered data, it's working on the raw data. The only filter they take into account is for cells - you can't filter out genes before normalization. 
+
+
+```{r}
+sobject <- NormalizeData(sobject,normalization.method = "LogNormalize", scale.factor = 10000)
+#select some housekeeping genes
+genes = c("mpeg1.1",'hexb','ptprc','cd74a','lgmn') 
+VlnPlot(sobject,genes,group.by = "sample_description")
+GetAssayData(sobject)[1:10, 1:15]
+table(sobject$sample_description)
+```
+
+
+Filtering out genes in Seurat - use AFTER normalization. Works on data object (i.e. normalized, filtered data). 
+Option A: standard
+
+```{r}
+sobject<-FindVariableFeatures(sobject, selection.method = "vst", nfeatures = 6000)
+top10 <- head(VariableFeatures(sobject),10)
+plot1 <- VariableFeaturePlot(sobject)
+plot2 <- LabelPoints(plot=plot1, points = top10, repel = T, xnudge = 0, ynudge = 0)
+plot2
+```
+
+Scale the data
+```{r}
+all.genes<-rownames(sobject)
+var.genes = VariableFeatures(sobject)
+add.genes = c('fcrls', 'olfml3', 'lgmn', 'cx3cr1','hexb','apoeb','mpeg1.1')
+add.genes = add.genes[!add.genes %in% var.genes]
+any(add.genes %in% var.genes)
+scalegenes = c(var.genes,add.genes)
+
+sobject<-ScaleData(sobject,features = scalegenes, vars.to.regress = c("nFeature_RNA","percent.ribo","age"))
+```
+
+
+
+Dimensionality reduction. Note that UMAP can be run directly on most variable features as well, but this will take forever unless you severely restrict #genes. 
+```{r}
+sobject <- RunPCA(sobject,features = scalegenes,npcs = 50, verbose = FALSE)
+
+set.seed(1)
+#figure out how many PCs to use - can default to 30
+ElbowPlot(sobject,ndims = 50, reduction = "pca")
+print(sobject[["pca"]], dims = 1:20, nfeatures = 5)
+#look for heat shock proteins or Malat1
+FeaturePlot(sobject,"percent.mito",reduction = "pca",dims = 1:2 )
+```
+Harmony - reduce difference
+
+```{r}
+set.seed(1)
+sobject <- RunHarmony(sobject, "age")
+```
+
+
+```{r}
+sobject <- RunUMAP(sobject, reduction = "harmony",dims = 1:20)
+#sobject<-RunUMAP(sobject,reduction = "pca",dims = 1:20, verbose = F)
+sobject<-FindNeighbors(sobject,reduction = "harmony", dims=1:20,verbose=F)
+set.seed(1)
+res = seq(0.5,3,by = 0.5) #set this to anything
+sobject<-FindClusters(sobject,verbose=F,resolution = 0.3) 
+save(sobject,file = file.path(dir,"Graphs_Analysis_August2020 mpeg only/Data/mpegonly_all_harmony.RData"))
+```
+
+Function to print multiple graphs: 
+
+```{r}
+PrintSeuratGraph = function(namecard = "a",sobject,graphtype = "feature",colors = c("lightgrey","lightblue","yellow","orange","darkorange","red"), feature = NULL,group = NULL,split=NULL,cellnames=NULL,sort = F){
+  if (!is.null(cellnames)){
+    Idents(sobject) = cellnames[1]
+    cells = colnames(sobject)[Idents(sobject) %in% cellnames[2:length(cellnames)]]} 
+  else {cells = cellnames}
+  if (graphtype == "feature"){
+    graph = FeaturePlot(sobject,features = feature,split.by = split, cells = cells,cols = colors)
+  }
+  if (graphtype == "violin"){
+    graph = VlnPlot(sobject,features = feature, pt.size = 0.1, idents = cellnames[2:length(cellnames)],group.by = group, split.by = split)
+  }
+  if (graphtype == "dim"){
+    graph = DimPlot(sobject,cells = cells, group.by = group, split.by = split)
+    
+  }
+  name = paste0(feature,"_",graphtype,namecard,".eps")
+  graph
+  setEPS()
+  postscript(file.path("~/Desktop",name))
+  print(graph)
+  dev.off()
+}
+
+```
+
+
+```{r}
+DimPlot(sobject,label=T,reduction = "umap")
+genes = c("marco","mpeg1.1","pcna","apoeb","b2m","p2ry12","ptprc","hexb","irf8","spi1b","spi1a","csf1ra","csf1rb","slc7a7","c1qa","c1qb","c1qc")
+
+features = c("percent.mito","percent.ribo","nCount_RNA","nFeature_RNA")
+genesHB = c("ccl19a.1","wipf1a","b2m","plp1b","krt18b","cxcr4b","cd74b","cd74a","gpatch8","mhc2dab","ms4a17a.6","cdc42l","dhrs9","bzw1b","lygl1","hmga1a","top1l","plekho2")
+
+genesOT = c("bzw2","slc40a1","g0s2","ctsla","eepd1","slc43a2b","apoeb","pitpnaa","rnaset2","mt2","ctsz","cndp2","dpp7","abca1a","pdgfd","ctsd","pepd","mafbb","ppdpfb","slc7a7","glud1b","porb","galk1","bri3","glula","abhd12","ubb","rgl1","mpp1","hmgb3a","abca1b","ctsba","ctsc","vat1")
+
+length(genesOT)
+
+genes = genes[genes %in% scalegenes]
+FeaturePlot(sobject,genes[1:6],reduction = "umap")
+FeaturePlot(sobject,genes[7:12], reduction = "umap")
+FeaturePlot(sobject,features = "percent.mito")
+FeaturePlot(sobject,features = "nCount_RNA")
+FeaturePlot(sobject,features = "nFeature_RNA")
+FeaturePlot(sobject,features = "percent.ribo")
+
+for(feature in c(genes)){
+  PrintSeuratGraph(namecard = "all_harmony-clusters",sobject=sobject,graphtype = "feature",feature = feature)
+}
+
+
+for(feature in c(features)){
+  PrintSeuratGraph(namecard = "all_harmony-clusters",sobject=sobject,graphtype = "feature",feature = feature,colors = c("lightgrey","purple"))
+}
+groups = c("age","sample_description","seurat_clusters")
+
+for(group in groups){
+  PrintSeuratGraph(namecard = "all_harmony-clusters",sobject=sobject,graphtype = "dim",group = group, feature = group)
+}
+
+for(feature in genes){
+  PrintSeuratGraph(namecard = "all_harmony-clusters",sobject=sobject,graphtype = "violin",feature = feature,group = "seurat_clusters")
+}
+```
+
+
+
+```{r}
+DimPlot(sobject,reduction = "umap",group.by = "sample_description")
+DimPlot(sobject,reduction = "umap",group.by = "sample_description",split.by = "age")
+DimPlot(sobject,reduction = "umap",group.by = "seurat_clusters",split.by = "sample_description",label = F)
+
+setEPS()
+postscript("~/Desktop/juv_adult_harmony_split.eps")
+DimPlot(sobject,reduction = "umap",group.by = "seurat_clusters",split.by = "age")
+dev.off()
+
+setEPS()
+postscript("~/Desktop/juv_adult_umap.eps")
+DimPlot(sobject,reduction = "umap",group.by = "sample_description")
+dev.off()
+
+setEPS()
+postscript("~/Desktop/splitall_umap.eps")
+DimPlot(sobject,reduction = "umap",group.by = "seurat_clusters",split.by = "sample_description",label = F)
+dev.off()
+```
+
+
+```{r}
+Idents(sobject) = "seurat_clusters"
+sobject= BuildClusterTree(sobject,dims = 1:30)
+tree = sobject@tools$BuildClusterTree
+setEPS()
+postscript("~/Desktop/tree_allharmony.eps")
+plot.phylo(tree, use.edge.length = T, direction = "rightwards")
+dev.off()
+```
+
+Heatmap for sobject - now with clusters 7 + 8 removed
+
+```{r}
+clusters = as.factor(sobject$seurat_clusters)
+levels(clusters) = c("0","1","2","3","4","5","6","0","0")
+sobject$newclusters = clusters
+
+```
+
+```{r}
+Idents(sobject) = "newclusters"
+markers_all <- FindAllMarkers(
+    object = sobject,
+    features = rownames(GetAssayData(sobject,slot = "scale.data")),
+    test.use = "MAST",
+    only.pos = FALSE, 
+    min.pct = 0.25, #gene must be present in 25% of the cells in the cluster
+    logfc.threshold = 0.20
+)
+
+dim(markers_all)
+head(markers_all)
+write.csv(markers_all,file = "~/Desktop/all_markers_harmony.csv")
+
+markers_all = markers_all[markers_all$avg_logFC>0.2,]
+pcut = 10^-50
+markers_all = markers_all[markers_all$p_val_adj<pcut,]
+markers_all_single <- markers_all[markers_all$gene %in% names(table(markers_all$gene))[table(markers_all$gene) == 1],] #markers that define a single cluster
+
+topgenes <- markers_all_single %>% group_by(cluster) %>% top_n(10, avg_logFC)
+
+setEPS()
+postscript("~/Desktop/heatmap_allharmony_pval50.eps")
+DoHeatmap(
+    object = sobject, 
+    features = topgenes$gene,
+    group.by = 'seurat_clusters',
+    size = 5,
+    label = T,
+    draw.lines = T
+)
+
+dev.off()
+```
+```{r}
+
+markers_all = markers_all[markers_all$avg_logFC>0,]
+pcut = 10^-25
+markers_all = markers_all[markers_all$p_val_adj<pcut,]
+
+remove = grep(":",markers_all$gene)
+remove = c(remove,grep("BX",markers_all$gene))
+remove = c(remove,grep("CR",markers_all$gene))
+markers_all = markers_all[-remove,]
+
+markers_all_single <- markers_all[markers_all$gene %in% names(table(markers_all$gene))[table(markers_all$gene) == 1],] #markers that define a single cluster
+
+
+topgenes <- markers_all_single %>% group_by(cluster) %>% top_n(3, avg_logFC)
+
+topgenes = c("ccr9a", "il2rb", "bcl2l10","il13", "eomesa","cd4-1", "lck","hexb","p2ry12","mpeg1.1")
+# Dot plots - the size of the dot corresponds to the percentage of cells expressing the feature
+# in each cluster. The color represents the average expression level
+RColorBrewer::brewer.pal.info
+DotPlot(sobject, features = topgenes,cols = "RdBu") + RotatedAxis()
+
+setEPS()
+postscript("~/Desktop/juvall_dotplot.eps")
+DotPlot(sobject, features = topgenes, cols = "RdBu") + RotatedAxis()
+dev.off()
+
+```
+Make a barplot
+
+```{r}
+t = table(sobject$newclusters,sobject$age)
+total = colSums(t)
+t = rbind(t,total)
+a = t[,"Adult"]/total[1]
+j = t[,"Juvenile"]/total[2]
+t = cbind(t,a,j)
+relj = rep(0,nrow(t))
+rela = rep(0,nrow(t))
+t = cbind(t,rela,relj)
+
+for(i in 1:nrow(t)){
+  rela = t[i,'a']/(t[i,'j']+t[i,'a'])*100
+  t[i,'rela'] = rela
+}
+
+for(i in 1:nrow(t)){
+  relj = t[i,'j']/(t[i,'j']+t[i,'a'])*100
+  t[i,'relj'] = relj
+}
+x = t[,c('rela','relj')]
+colnames(x) = c("Adult","Juvenile")
+x = x[1:7,]
+x = t(x)
+
+barplot(x,beside = F,legend = T,ylim = c(0,100),col = c("forestgreen","skyblue"))
+
+setEPS()
+postscript("~/Desktop/adultvjuvenile.eps")
+barplot(x,beside = F,legend = T,ylim = c(0,100),col = c("forestgreen","skyblue"))
+dev.off()
+
+```
+
+```{r}
+DimPlot(sobject,label = T)
+DimPlot(sobject,group.by = "sample_description")
+
+FeaturePlot(sobject,c("hexb",'p2ry12','mpeg1.1','pcna'))
+VlnPlot(sobject,c('hexb','p2ry12','apoeb','ptprc','mpeg1.1'),pt.size = 0.001,sort = T)
+
+sobject = BuildClusterTree(sobject,dims = 1:30)
+PlotClusterTree(sobject)
+```
+```{r}
+table(sobject$age,sobject$seurat_clusters)
+```
+
+
+```{r}
+juv = c(0,4)
+adult = c(1,5,6,7)
+macrophage = 3
+proliferating = 2
+
+clusters = as.factor(sobject$seurat_clusters)
+table(clusters)
+x = as.character(levels(clusters))
+x[juv+1] = "juvenile"
+x[adult+1] = "adult"
+x[macrophage+1] = "macrophage"
+x[proliferating+1] = "proliferating"
+levels(clusters) = x
+sobject$juv_v_adult = clusters
+table(sobject$juv_v_adult,sobject$seurat_clusters)
+save(sobject,file = "~/Desktop/mpeg_all_regressed.RData")
+```
+
+```{r}
+setEPS()
+postscript("~/Desktop/all_vln_mpeg_pcna_bytype.eps")
+VlnPlot(sobject,c("mpeg1.1","pcna","p2ry12","siglec15l"),group.by = "juv_v_adult")
+dev.off()
+```
+
+
+```{r}
+Idents(sobject) = "juv_v_adult"
+sobject = BuildClusterTree(sobject,dims = c(1:30))
+tree = sobject@tools$BuildClusterTree
+setEPS()
+postscript("~/Desktop/tree_mpegjuv_v_adult.eps")
+plot.phylo(tree, use.edge.length = T, direction = "rightwards")
+dev.off()
+```
+```{r}
+Idents(sobject) = 'juv_v_adult'
+markers_all = FindAllMarkers(
+  object = sobject,
+  features = rownames(GetAssayData(sobject,slot = "scale.data")),
+  test.use = "MAST", 
+  only.pos = FALSE, 
+  min.pct = 0.10, 
+  logfc.threshold = 0.00)
+
+
+dim(markers_all)
+```
+
+```{r}
+head(markers_all)
+write.csv(markers_all,file = "~/Desktop/juv_v_adult_mpeg.csv")
+
+
+
+pcut = 10^-50
+markers_all = markers_all[markers_all$p_val_adj<pcut,]
+markers_all = markers_all[markers_all$avg_logFC>0.2,]
+
+markers_all_single <- markers_all[markers_all$gene %in% names(table(markers_all$gene))[table(markers_all$gene) == 1],] #markers that define a single cluster
+
+topgenes <- markers_all_single %>% group_by(cluster) %>% top_n(10, avg_logFC)
+
+setEPS()
+postscript("~/Desktop/heatmap_juv_v_adult_mpeg_pval502.eps")
+DoHeatmap(
+    object = sobject, 
+    features = topgenes$gene,
+    group.by = 'juv_v_adult',
+    size = 5,
+    label = T,
+    draw.lines = T
+)
+
+dev.off()
+
+```
+
+```{r}
+#load("/Users/whippoorwill/Desktop/Sequencing/Nick/2_2020/Graphs_Analysis_August2020 mpeg only/Data/mpegonly_all_3.RData")
+
+de = read.csv("/Users/whippoorwill/Desktop/Sequencing/Nick/2_2020/Graphs_Analysis_August2020 mpeg only/adultvjuvenile ribo regressed/Spreadsheets/all_markers_mpeg.csv",stringsAsFactors = F)
+
+head(de)
+```
+
+
+```{r}
+table(de$cluster)
+de[de$cluster == '2',]
+de[de$cluster == '3',]
+de[de$cluster == '4',]
+genes = c("pcna","mki67","ccl19a.1","p2ry12","mpeg1.1","hexb","cd74a","bzw2")
+FeaturePlot(sobject,c('pcna','mki67'))
+DimPlot(sobject,group.by = "juv_v_adult")
+groups = c("juv_v_adult","sample_description","seurat_clusters")
+
+for(group in groups){
+  PrintSeuratGraph(namecard = "juv_v_adult_mpeg",sobject=sobject,graphtype = "dim",group = group, feature = group)
+}
+
+for(feature in genes){
+  PrintSeuratGraph(namecard = "all_mpeg",sobject=sobject,graphtype = "violin",feature = feature,group = "seurat_clusters")
+}
+
+for(feature in genes){
+  PrintSeuratGraph(namecard = "all_mpeg",sobject=sobject,graphtype = "feature",feature = feature,group = "seurat_clusters")
+}
+```

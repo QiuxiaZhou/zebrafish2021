@@ -1,0 +1,147 @@
+---
+title: "bulksinglecelloverlay"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+Calculate a module eigengene
+
+load in the single cell object
+```{r}
+load("~/Desktop/Sequencing/Nick/2_2020/Graphs_Analysis_August2020 mpeg only/Data/mpeg_juvenile.RData")
+```
+
+```{r}
+PrintSeuratGraph = function(namecard = "a",sobject,graphtype = "feature",colors = c("lightgrey","lightblue","yellow","orange","darkorange","red"), feature = NULL,group = NULL,split=NULL,cellnames=NULL,sort = F){
+  if (!is.null(cellnames)){
+    Idents(sobject) = cellnames[1]
+    cells = colnames(sobject)[Idents(sobject) %in% cellnames[2:length(cellnames)]]} 
+  else {cells = cellnames}
+  if (graphtype == "feature"){
+    graph = FeaturePlot(sobject,features = feature,split.by = split, cells = cells,cols = colors)
+  }
+  if (graphtype == "violin"){
+    graph = VlnPlot(sobject,features = feature, pt.size = 0.1, idents = cellnames[2:length(cellnames)],group.by = group, split.by = split)
+  }
+  if (graphtype == "dim"){
+    graph = DimPlot(sobject,cells = cells, group.by = group, split.by = split)
+    
+  }
+  name = paste0(feature,"_",graphtype,namecard,".eps")
+  graph
+  setEPS()
+  postscript(file.path("~/Desktop",name))
+  print(graph)
+  dev.off()
+}
+
+```
+
+Read in region-specific files
+```{r}
+bulkHBvMB = read.table("/Users/whippoorwill/Desktop/Sequencing/Nick/2_2020/Graphs_Analysis_August2020 mpeg only/RNAseq_dfp28/DEgenesHBvsMB005.txt",stringsAsFactors = F)
+bulkOTvHB = read.table("/Users/whippoorwill/Desktop/Sequencing/Nick/2_2020/Graphs_Analysis_August2020 mpeg only/RNAseq_dfp28/DEgenesOTvsHB005.txt",stringsAsFactors = F)
+bulkOTvMB = read.table("/Users/whippoorwill/Desktop/Sequencing/Nick/2_2020/Graphs_Analysis_August2020 mpeg only/RNAseq_dfp28/DEgenesOTvsMB005.txt",stringsAsFactors = F)
+#Macro = read.csv("~/Desktop/RNAseq_dfp28/macro_jem.csv",stringsAsFactors = F)
+```
+
+Create consensus lists for each region
+
+```{r}
+bulkpval = 0.05
+bulklfc = 1.2 #1.5
+bulkbasemean = 100 #600
+bulkOTvHB = bulkOTvHB[bulkOTvHB$padj<bulkpval & bulkOTvHB$baseMean > bulkbasemean,]
+bulkOTvMB = bulkOTvMB[bulkOTvMB$padj<bulkpval & bulkOTvMB$baseMean > bulkbasemean,]
+bulkHBvMB = bulkHBvMB[bulkHBvMB$padj<bulkpval & bulkHBvMB$baseMean > bulkbasemean,]
+
+HB = bulkHBvMB[bulkHBvMB$log2FoldChange > bulklfc,]
+HB2 = bulkOTvHB[bulkOTvHB$log2FoldChange < -bulklfc,]
+HB = rbind(HB,HB2)
+
+OT = bulkOTvHB[bulkOTvHB$log2FoldChange > bulklfc,]
+OT2 = bulkOTvMB[bulkOTvMB$log2FoldChange > bulklfc,]
+OT = rbind(OT,OT2)
+
+MB = bulkHBvMB[bulkHBvMB$log2FoldChange < -bulklfc,]
+MB2 = bulkOTvMB[bulkOTvMB$log2FoldChange < -bulklfc,]
+MB = rbind(MB,MB2)
+```
+
+Look for non-overlapping markers
+```{r}
+HBcut = HB[!HB$Gene_ID %in% MB$Gene_ID,]
+HBcut = HBcut[!HBcut$Gene_ID %in% OT$Gene_ID,]
+
+OTcut = OT[!OT$Gene_ID %in% MB$Gene_ID,]
+OTcut = OTcut[!OTcut$Gene_ID %in% HB$Gene_ID,]
+
+
+MBcut = MB[abs(MB$log2FoldChange)> 2,]
+MBcut = MBcut[MBcut$baseMean> 300,]
+MBcut = MBcut[!is.na(MBcut$baseMean),]
+
+#Macro = Macro[Macro$logfc_all_cluster_fg_vs_control>5,]
+```
+
+Add a column to scdefile with "HB","OT", "MB", or "none"
+```{r}
+scdefile = read.csv("~/Desktop/Sequencing/Nick/2_2020/Graphs_Analysis_August2020 mpeg only/New analyses - updated QC/Juvenile_withoutcluster1/Spreadsheets/juvenile_mpeg_markers.csv")
+scdefile$regionalID = "none"
+#scdefile$regionalID[scdefile$gene %in% Macro$genename] = "Macro"
+scdefile$regionalID[scdefile$gene %in% HBcut$Gene_ID] = "HB"
+
+scdefile$regionalID[scdefile$gene %in% OTcut$Gene_ID] = "OT"
+scdefile$regionalID[scdefile$gene %in% MBcut$Gene_ID] = "MB"
+
+table(scdefile$regionalID)
+table(scdefile$cluster)
+table(scdefile$regionalID,scdefile$cluster)
+```
+
+
+```{r}
+HBmodule = HBcut$Gene_ID
+HBmodule = HBmodule[HBmodule %in% rownames(sobject)]
+
+OTmodule = OTcut$Gene_ID
+OTmodule = OTmodule[OTmodule %in% rownames(sobject)]
+
+MBmodule = MBcut$Gene_ID
+MBmodule = MBmodule[MBmodule %in% rownames(sobject)]
+
+sobject = PercentageFeatureSet(sobject,features = HBmodule,col.name = "HBe")
+sobject = PercentageFeatureSet(sobject,features = OTmodule,col.name = "OTe")
+sobject = PercentageFeatureSet(sobject,features = MBmodule,col.name = "MBe")
+FeaturePlot(sobject,"HBe")
+FeaturePlot(sobject,"OTe")
+FeaturePlot(sobject,"MBe")
+
+features = c("HBe","OTe","MBe")
+for(feature in features){
+  PrintSeuratGraph(namecard = "juvenile-green",sobject=sobject,graphtype = "feature",feature = feature,colors = c("light grey","lightgreen","forestgreen","darkgreen","black"))
+}
+
+
+for(feature in features){
+  PrintSeuratGraph(namecard = "juvenile-blue",sobject=sobject,graphtype = "feature",feature = feature,colors = c("light grey","lightblue","blue","darkblue","black"))
+}
+
+for(feature in "HBe"){
+  PrintSeuratGraph(namecard = "juvenile-red",sobject=sobject,graphtype = "feature",feature = feature,colors = c("light grey","red","maroon","darkred","black"))
+}
+
+for(feature in features){
+  PrintSeuratGraph(namecard = "juvenile2",sobject=sobject,graphtype = "violin",feature = feature)
+}
+
+FeaturePlot(sobject,features = c("OTe","HBe"),blend = T,cols = c("dark blue","dark red"),min.cutoff = 0.001,blend.threshold = 0.1)
+
+FeaturePlot(sobject,features = c("HBe"))
+```
+

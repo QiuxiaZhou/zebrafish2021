@@ -1,0 +1,606 @@
+---
+title: "Monocle"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r}
+library(BiocGenerics)
+library(monocle3)
+library(Seurat)
+```
+```{r}
+#BiocManager::install("Matrix")
+#BiocManager::install(c('BiocGenerics', 'DelayedArray', 'DelayedMatrixStats',
+                       #'limma', 'S4Vectors', 'SingleCellExperiment',
+                       #'SummarizedExperiment', 'batchelor', 'Matrix.utils'))
+#devtools::install_github('cole-trapnell-lab/leidenbase')
+#devtools::install_github('cole-trapnell-lab/monocle3')
+```
+```{r}
+load("/Users/whippoorwill/Desktop/Sequencing/Nick/2_2020/Graphs_Analysis_August2020 mpeg only/Data/mpegonly_all_harmony.RData")
+#named sobject
+```
+
+
+```{r}
+clusters = as.character(sobject$finalclusters)
+names(clusters) = colnames(sobject)
+clusters[clusters == '1'] = "NAM"
+clusters[clusters == '3'] = "SAM"
+clusters[clusters == '4'] = "A4"
+
+sobject$namedclusters = clusters
+table(sobject$namedclusters)
+```
+
+```{r}
+expression_matrix <- GetAssayData(sobject,assay = "RNA",slot = "counts")
+cell_metadata <- sobject@meta.data
+gene_annotation <- cbind(rownames(sobject),"gene_short_name" = rownames(sobject))
+rownames(gene_annotation) = rownames(sobject)
+
+cds <- new_cell_data_set(expression_matrix,
+                         cell_metadata = cell_metadata,
+                         gene_metadata = gene_annotation)
+```
+
+```{r}
+cds <- preprocess_cds(cds, num_dim = 50,)
+cds <- align_cds(cds, alignment_group = "age", residual_model_formula_str = "~ percent.mito + nCount_RNA")
+```
+```{r}
+cds <- reduce_dimension(cds,)
+```
+
+
+```{r}
+setEPS()
+postscript("~/Desktop/nick_clusters_monocle.eps")
+plot_cells(cds, label_groups_by_cluster=T,  color_cells_by = "namedclusters",group_label_size = 5,show_trajectory_graph = F)
+dev.off()
+
+setEPS()
+postscript("~/Desktop/nick_age_monocle.eps")
+plot_cells(cds, label_groups_by_cluster=T,  color_cells_by = "age",group_label_size = 5)
+dev.off()
+```
+
+```{r}
+genes <- c("lygl1","c1qa","grn1","lgals9l1","ctsz","mki67")
+
+plot_cells(cds,
+           genes=genes,
+           label_cell_groups=FALSE,
+           show_trajectory_graph=FALSE)
+```
+
+```{r}
+cds <- cluster_cells(cds,cluster_method = "leiden")
+plot_cells(cds, color_cells_by = "partition")
+```
+
+```{r}
+cds <- learn_graph(cds)
+plot_cells(cds,
+           color_cells_by = "namedclusters",
+           label_groups_by_cluster=FALSE,
+           label_leaves=FALSE,
+           label_branch_points=FALSE)
+```
+
+
+```{r}
+cds <- order_cells(cds)
+```
+```{r}
+setEPS()
+postscript("~/Desktop/pseudo_nick_all.eps")
+plot_cells(cds,
+           color_cells_by = "pseudotime",
+           label_cell_groups=FALSE,
+           label_leaves=FALSE,
+           label_branch_points=FALSE,
+           graph_label_size=4)
+dev.off()
+```
+```{r}
+# a helper function to identify the root principal points:
+get_earliest_principal_node <- function(cds, time_bin="Juvenile"){
+  cell_ids <- which(colData(cds)[, "age"] == time_bin)
+  
+  closest_vertex <-
+  cds@principal_graph_aux[["UMAP"]]$pr_graph_cell_proj_closest_vertex
+  closest_vertex <- as.matrix(closest_vertex[colnames(cds), ])
+  root_pr_nodes <-
+  igraph::V(principal_graph(cds)[["UMAP"]])$name[as.numeric(names
+  (which.max(table(closest_vertex[cell_ids,]))))]
+  
+  root_pr_nodes
+}
+cds <- order_cells(cds, root_pr_nodes=get_earliest_principal_node(cds))
+```
+```{r}
+plot_cells(cds,
+           color_cells_by = "pseudotime",
+           label_cell_groups=FALSE,
+           label_leaves=FALSE,
+           label_branch_points=FALSE,
+           graph_label_size=4)
+```
+```{r}
+library(sf)
+plot_cells(cds,
+           color_cells_by = "namedclusters",
+           label_groups_by_cluster=FALSE,
+           label_leaves=FALSE,
+           label_branch_points=FALSE)
+
+test_res <- graph_test(cds, neighbor_graph="principal_graph", cores=4)
+```
+
+
+```{r}
+pr_deg_ids <- row.names(subset(test_res, q_value < 0.005))
+head(pr_deg_ids)
+
+plot_cells(cds, genes=head(pr_deg_ids),
+           show_trajectory_graph=FALSE,
+           label_cell_groups=FALSE,
+           label_leaves=FALSE)
+```
+Comparison with human fetal microglia expression
+```{r}
+
+#BiocManager::install("biomaRt")
+library(biomaRt)
+library(Seurat)
+load("/Users/whippoorwill/Desktop/Sequencing/Nick/2_2020/Graphs_Analysis_August2020 mpeg only/Data/mpeg_juvenile.RData")
+
+```
+
+```{r}
+listEnsembl()
+ensembl <- useEnsembl(biomart = "genes")
+datasets <- listDatasets(ensembl)
+head(datasets)
+
+searchDatasets(mart = ensembl, pattern = "hsapiens")
+searchDatasets(mart = ensembl, pattern = "drerio")
+
+ensembl <- useDataset(dataset = "drerio_gene_ensembl", mart = ensembl)
+mart <- useEnsembl(dataset = "drerio_gene_ensembl", biomart='ensembl')
+head(keytypes(mart), n = 300)
+
+keytype = "with_hsapiens_homolog"
+filters = listFilters(ensembl)
+filters[1:100,]
+searchAttributes(mart = ensembl,pattern = 'hsapiens')
+searchFilters(mart = ensembl, pattern = "zfin")
+
+getBM(attributes = c("ensembl_gene_id","external_synonym","external_gene_name","hgnc_symbol"),
+      filters = "zfin_id_symbol",values = c("mki67"),
+      mart = ensembl)
+```
+
+
+```{r}
+human <- useEnsembl("ensembl", dataset = "hsapiens_gene_ensembl")
+zebrafish <- useEnsembl("ensembl", dataset = "drerio_gene_ensembl")
+```
+
+
+```{r}
+zfin_to_human = getLDS(attributes = c("external_gene_name"),
+       filters = "zfin_id_symbol", values = rownames(sobject),
+       mart = zebrafish,
+       attributesL = c("hgnc_symbol"), 
+       martL = human)
+```
+
+```{r}
+dim(zfin_to_human)
+sum(duplicated(zfin_to_human$HGNC.symbol))
+length(rownames(sobject)) #17321 out of 23367 zebrafish genes are annotated to human equivalents, with 4542 duplicated human genes
+```
+
+
+```{r}
+#instead, load in the DE list and convert to zebrafish genes
+kgenes = read.csv("/Users/whippoorwill/Desktop/reviewNickfigures/KrachtMGDE.csv",stringsAsFactors = F)
+for (i in 1:nrow(kgenes)){
+  gene = kgenes[i,"gene"]
+  ncols = 1
+  if (gene %in% zfin_to_human$HGNC.symbol){
+    newgene = zfin_to_human[zfin_to_human$HGNC.symbol == gene,"Gene.name"]
+    ncols = length(newgene)
+  } else {newgene = NA}
+  for (j in 1:ncols){
+    kgenes[i,paste0("zfingene",j)] = newgene[j]
+  }
+}
+
+
+head(kgenes)
+dim(kgenes)
+sum(is.na(kgenes$zfingene1)) #306 of 1054 genes are not annotated
+
+```
+```{r}
+#for each cluster in the human fetal dataset, replace gene name with zebrafish equivalent(s)
+allclusters = list()
+for (cluster in 1:16){
+  clustergenes = kgenes[kgenes$cluster == cluster, 8:ncol(kgenes)]
+  clustergenes = unlist(clustergenes,use.names = F)
+  clustergenes = clustergenes[!is.na(clustergenes)]
+  allclusters[[cluster]] = clustergenes
+}
+#allclusters
+```
+
+
+```{r}
+sobject = AddModuleScore(sobject,features = allclusters,name = "humanfetal")
+```
+
+```{r}
+save(sobject,file = "~/Desktop/Sequencing/Nick/2_2020/Graphs_Analysis_August2020 mpeg only/Data/mpeg_juvenile.RData")
+```
+
+
+```{r}
+setEPS()
+postscript("~/Desktop/Sequencing/Nick/2_2020/humancomparison/DimPlotJuv.eps")
+DimPlot(sobject,group.by = "seurat_clusters")
+dev.off()
+
+for (i in 1:16){
+  column = paste0("humanfetal",i)
+  setEPS()
+  postscript(paste0("~/Desktop/Sequencing/Nick/2_2020/humancomparison/",column,".eps"))
+  print(VlnPlot(sobject,column, group.by = "seurat_clusters"))
+  dev.off()
+  
+}
+
+#1 = Nam, 3 = Sam
+#JM1 = OT, JM4 = HB, 2 = proliferating (fetal cluster 6), 
+#JM1 = human fetal 5 and 3
+#JM4 similar-ish to human fetal 11, 
+```
+Significance
+```{r}
+#1. Make a data table
+columns = c()
+for (i in 1:16){
+  columns[i] = paste0("humanfetal",i)
+}
+
+t = sobject@meta.data[,c(columns,"seurat_clusters")]
+
+#2. What you want to compare: for each human fetal cluster, is there any significant correlation with my clusters? make this a loop later
+my_anova <- aov(get(column) ~ finalclusters, data = t)
+  print(column)
+  print(Anova(my_anova,type = "II"))
+library(car)
+
+for (i in 1:16){
+  column = paste0("humanfetal",i)
+  print(column)
+  print(kruskal.test(get(column) ~ seurat_clusters, data = t))
+  for (k in 0:5){
+    x = t
+    x$seurat_clusters = as.character(x$seurat_clusters)
+    x$seurat_clusters[x$seurat_clusters !=k] = "all"
+    print(paste0(column," correlated with zebrafish cluster ",k))
+    print(wilcox.test(get(column) ~ seurat_clusters,data = x,conf.int = T, alternative = "greater"))
+  }
+}
+```
+
+Make a set of tables with individual p-values, statistics, estimates (~fold change) for each of our clusters over all our other cells for each human fetal cluster signature
+```{r}
+t$seurat_clusters = droplevels(t$seurat_clusters)
+r = levels(t$seurat_clusters)
+c = colnames(t)[1:16]
+
+est = matrix(data = rep(0,length(r)*length(c)), nrow = length(r),ncol = length(c),dimnames = list(r,c))
+stat = matrix(data = rep(0,length(r)*length(c)), nrow = length(r),ncol = length(c),dimnames = list(r,c))
+pval = matrix(data = rep(0,length(r)*length(c)), nrow = length(r),ncol = length(c),dimnames = list(r,c))
+
+for (i in 1:16){
+  column = paste0("humanfetal",i)
+  for (k in 0:5){
+    x = t
+    x$seurat_clusters = as.character(x$seurat_clusters)
+    x$seurat_clusters[x$seurat_clusters !=k] = "all"
+    n = wilcox.test(get(column) ~ seurat_clusters,data = x,conf.int = T)
+    est[k+1,i] = n$estimate 
+    stat[k+1,i] = n$statistic/(1e5)
+    pval[k+1,i] = n$p.value
+  }
+}
+```
+
+Make a heatmap
+
+```{r}
+library(pheatmap)
+heatmap(est,Rowv = NA,Colv = NA,symm = F,xlab = "Source",ylab = "Target",scale = "none")
+
+pheatmap(est, display_numbers = T,scale = "none",cluster_cols = F,cluster_rows = F )
+
+setEPS()
+postscript("~/Desktop/heatmap_nickvhumanest.eps")
+print(pheatmap(t(est), display_numbers = T,scale = "none",cluster_cols = F,cluster_rows = F))
+dev.off()
+
+setEPS()
+postscript("~/Desktop/heatmap_nickvhumanstat.eps")
+print(pheatmap(t(stat), display_numbers = T,scale = "none",cluster_cols = F,cluster_rows = F))
+dev.off()
+
+pvalplot = -log10(pval)
+setEPS()
+postscript("~/Desktop/heatmap_nickvhumanpval.eps")
+print(pheatmap(t(pvalplot), display_numbers = T,scale = "none",cluster_cols = F,cluster_rows = F))
+dev.off()
+```
+
+
+Print out metadata, umap, pcs
+
+```{r}
+#1. juvenile
+load("/Users/whippoorwill/Desktop/Sequencing/Nick/2_2020/Graphs_Analysis_August2020 mpeg only/Data/mpeg_juvenile.RData")
+metadata = sobject@meta.data
+write.csv(metadata,"~/Desktop/Jupyter/velocity_Nick/juv_meta.csv")
+pcs = sobject@reductions$pca@cell.embeddings
+write.csv(pcs, "~/Desktop/Jupyter/velocity_Nick/juv_pcs.csv")
+umap = sobject@reductions$umap@cell.embeddings
+write.csv(umap, "~/Desktop/Jupyter/velocity_Nick/juv_umap.csv")
+
+#2. adult
+load("/Users/whippoorwill/Desktop/Sequencing/Nick/2_2020/Graphs_Analysis_August2020 mpeg only/Data/mpeg_adult.RData")
+write.csv(metadata, "~/Desktop/Jupyter/velocity_Nick/adult_meta.csv")
+pcs = sobject@reductions$pca@cell.embeddings
+write.csv(pcs, "~/Desktop/Jupyter/velocity_Nick/adult_pcs.csv")
+umap = sobject@reductions$umap@cell.embeddings
+write.csv(umap, "~/Desktop/Jupyter/velocity_Nick/adult_umap.csv")
+
+#3. both
+load("/Users/whippoorwill/Desktop/Sequencing/Nick/2_2020/Graphs_Analysis_August2020 mpeg only/Data/mpegonly_all_harmony.RData")
+write.csv(metadata, "~/Desktop/Jupyter/velocity_Nick/all_meta.csv")
+pcs = sobject@reductions$pca@cell.embeddings
+write.csv(pcs, "~/Desktop/Jupyter/velocity_Nick/all_pcs.csv")
+umap = sobject@reductions$umap@cell.embeddings
+write.csv(umap, "~/Desktop/Jupyter/velocity_Nick/all_umap.csv")
+genes = rownames(sobject)
+write.csv(genes,"~/Desktop/Jupyter/velocity_Nick/genes.csv")
+```
+
+```{r}
+head(metadata)
+pcs[1:5,1:5]
+
+all(rownames(pcs) == rownames(metadata))
+```
+```{r}
+load("~/Desktop/Sequencing/Nick/2_2020/Graphs_Analysis_August2020 mpeg only/Data/mpeg_juvenile.RData")
+
+```
+Try different clustering resolutions (currently 0.3)
+```{r}
+table(sobject$RNA_snn_res.0.3,sobject$finalclusters)
+sobject = FindClusters(sobject,res = c(0.05,0.1,0.5,1))
+```
+
+show pattern of clustering,volcano plot of cluster 1 vs 0 only as well as 0+1 pooled vs 4 (same overall genes)
+
+```{r}
+DimPlot(sobject,group.by = "RNA_snn_res.0.05")
+setEPS()
+postscript("~/Desktop/reviewNickfigures/resolution/0.1.eps")
+DimPlot(sobject,group.by = "RNA_snn_res.0.1")
+dev.off()
+
+setEPS()
+postscript("~/Desktop/reviewNickfigures/resolution/0.3.eps")
+DimPlot(sobject,group.by = "RNA_snn_res.0.3")
+dev.off()
+
+setEPS()
+postscript("~/Desktop/reviewNickfigures/resolution/0.5.eps")
+DimPlot(sobject,group.by = "RNA_snn_res.0.5")
+dev.off()
+
+
+DimPlot(sobject,group.by = "RNA_snn_res.0.3")
+DimPlot(sobject,group.by = "RNA_snn_res.0.5")
+DimPlot(sobject,group.by = "RNA_snn_res.1")
+
+Idents(sobject) = "RNA_snn_res.0.3"
+```
+
+
+```{r}
+#cluster 0 vs 1
+c1v0 = FindMarkers(sobject,ident.1 = "1",ident.2 = "0",group.by = "seurat_clusters",features = rownames(sobject),logfc.threshold = 0,min.pct = 0.1,assay = "RNA",slot = "counts",test.use = "MAST")
+
+#cluster 6 vs 0
+c5v0 = FindMarkers(sobject,ident.1 = "5",ident.2 = "0",group.by = "seurat_clusters",features = rownames(sobject),logfc.threshold = 0,min.pct = 0.1,assay = "RNA",slot = "counts",test.use = "MAST")
+
+#cluster 4 v 1
+c4v1 = FindMarkers(sobject,ident.1 = "4",ident.2 = "1",group.by = "seurat_clusters",features = rownames(sobject),logfc.threshold = 0,min.pct = 0.1,assay = "RNA",slot = "counts",test.use = "MAST")
+
+#cluster 4 v 1+0
+c4v1_0 = FindMarkers(sobject,ident.1 = "4",ident.2 = c("0","1"),group.by = "seurat_clusters",features = rownames(sobject),logfc.threshold = 0,min.pct = 0.1,assay = "RNA",slot = "counts",test.use = "MAST")
+```
+
+```{r}
+#comparing cluster 1 to cluster 0
+c1v0 = c1v0[order(c1v0$avg_log2FC,decreasing = T),]
+head(c1v0) #top genes
+dim(c1v0[abs(c1v0$avg_log2FC)>0.5,]) #242 genes pass logfc threshold, 50 over 0.5 (log2 fold change; 2^0.5 = 40% increased, 0.2 = 15% increase)
+dim(c1v0[c1v0$p_val_adj<10e-3,])
+
+c5v0 = c5v0[order(c5v0$avg_log2FC,decreasing = T),]
+head(c5v0) #top genes
+dim(c5v0[abs(c5v0$avg_log2FC)>0.2,])
+dim(c5v0[c5v0$p_val_adj<10e-3,])
+
+c4v1 = c4v1[order(c4v1$avg_log2FC,decreasing = T),]
+head(c4v1)
+topgenesc4v1 = rownames(c4v1)[c4v1$avg_log2FC>0.2]
+
+c4v1_0 = c4v1_0[order(c4v1_0$avg_log2FC,decreasing = T),]
+head(c4v1_0)
+topgenesc4v1_0 = rownames(c4v1_0)[c4v1$avg_log2FC>0.2]
+```
+
+```{r}
+library(EnhancedVolcano)
+de = c1v0
+head(de)
+minfc = 1.15
+alpha = 1e-10
+
+colorkeysdown = rownames(de)[de$avg_log2FC < -log2(minfc) & de$p_val_adj < alpha]
+colorkeysup = rownames(de)[de$avg_log2FC > log2(minfc) & de$p_val_adj < alpha]
+
+#Either highlight specific genes or pick the top genes in colorkeysup/down
+top = de[de$p_val_adj<alpha,]
+top = rownames(top)[order(top$avg_log2FC)]
+highlight = c(head(top,15),tail(top,15))
+
+allcolors = rep("darkgrey",length(rownames(de)))
+names(allcolors) = rownames(de)
+
+allcolors[names(allcolors) %in% colorkeysdown] = "blue"
+allcolors[names(allcolors) %in% colorkeysup]= "red"
+#allcolors[names(allcolors) %in% highlight]= "yellow"
+
+#names(allcolors)[allcolors == "yellow"] = "labelled"
+names(allcolors)[allcolors == "red"] = "up"
+names(allcolors)[allcolors == "darkgrey"] = "-"
+names(allcolors)[allcolors == "blue"] = "down"
+```
+
+
+```{r}
+setEPS()
+postscript("~/Desktop/Volcano_1v0.eps")
+print(EnhancedVolcano(de,labhjust = 1,
+                lab = rownames(de),
+                x = 'avg_log2FC',
+                y = 'p_val_adj',
+                xlim = c(-3, 3),
+                title = "1v0",
+                subtitle = "",
+                drawConnectors = F,
+                legendPosition = 'right',
+                #legendVisible = F,
+                pCutoff = alpha,
+                FCcutoff = log2(minfc),
+                selectLab = highlight,
+                #transcriptPointSize = 1.5,
+                #transcriptLabSize = 2.0,
+                col=c('black', 'black', 'black', 'red3'),
+                colCustom = allcolors,
+                gridlines.major = F,
+                gridlines.minor = F,
+                colAlpha = 1))
+dev.off()
+
+print(EnhancedVolcano(de,labhjust = 1,
+                lab = rownames(de),
+                x = 'avg_log2FC',
+                y = 'p_val_adj',
+                xlim = c(-3, 3),
+                title = "1v0",
+                subtitle = "",
+                drawConnectors = F,
+                legendPosition = 'right',
+                #legendVisible = F,
+                pCutoff = alpha,
+                FCcutoff = log2(minfc),
+                selectLab = highlight,
+                #transcriptPointSize = 1.5,
+                #transcriptLabSize = 2.0,
+                col=c('black', 'black', 'black', 'red3'),
+                colCustom = allcolors,
+                gridlines.major = F,
+                gridlines.minor = F,
+                colAlpha = 1))
+
+ 
+```
+
+
+#number of genes over the threshold that are shared between 4 vs 1 and 4 vs 1+0
+```{r}
+print("overlap")
+
+length(topgenesc4v1[topgenesc4v1 %in% topgenesc4v1_0])
+print("4v1 exclusive")
+length(topgenesc4v1[!topgenesc4v1 %in% topgenesc4v1_0])
+
+print("4v1_0 exclusive")
+length(topgenesc4v1_0[!topgenesc4v1_0 %in% topgenesc4v1])
+```
+
+Pull together literature on BAMs in the mouse - hard to distinguish border-associated from meningeal and perivascular macrophages - can you distinguish? find profiles that are linked to each one? ginheaux
+
+cd169, lyve1, cd38, cd206,cd163 run feature plots
+
+steffen jung 
+at least distinguish from blood vs tissue macrophages
+
+look up more non-parenchymal markers (are they from blood? likely not)
+
+```{r}
+for (gene in c("lyve1b","cd63","mrc1b","ccl34b.1","ccl19")){
+  setEPS()
+  postscript(paste0("~/Desktop/Sequencing/Nick/2_2020/Graphs_Analysis_August2020 mpeg only/New analyses - updated QC/Juvenile_withoutcluster1/UMAP genes/",gene,".eps"))
+  print(FeaturePlot(sobject,gene))
+  dev.off()
+  
+  FeaturePlot(sobject,gene)
+}
+
+for (gene in c("lyve1b","cd63","mrc1b")){
+  
+  print(FeaturePlot(sobject,gene))
+}
+```
+```{r}
+for (gene in c("p2ry12","hexb","bzw2","g0s2","csf1ra","ptprc","emilin2a","emilin2b","gda","hp")){
+  setEPS()
+  postscript(paste0("~/Desktop/Sequencing/Nick/2_2020/Graphs_Analysis_August2020 mpeg only/New analyses - updated QC/Juvenile_withoutcluster1/UMAP genes/",gene,".eps"))
+  print(FeaturePlot(sobject,gene))
+  dev.off()
+  
+  FeaturePlot(sobject,gene)
+}
+
+
+  setEPS()
+  postscript("~/Desktop/Sequencing/Nick/2_2020/Graphs_Analysis_August2020 mpeg only/New analyses - updated QC/Juvenile_withoutcluster1/UMAP genes/flt3.eps")
+  print(FeaturePlot(sobject,"flt3"))
+  dev.off()
+
+#macrophage genes: emilin2, gda, hp, sell (from haage et al 2019)
+#F4/80 (adgre1), cd45 Pptprc), ccl22 from labome macrophage markers
+#zebrafish don't have f4/80
+#from Li/Barres: 
+#Ly6C hi monocytes
+#other macrophage types - high ptprc, mhc class II
+```
+
+
+

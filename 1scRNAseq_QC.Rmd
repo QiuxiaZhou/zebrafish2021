@@ -1,0 +1,328 @@
+---
+title: "Seurat_Code_LD_2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+
+```{r}
+#install.packages("BiocManager")
+
+#BiocManager::install("Seurat")
+#BiocManager::install("ggplot2")
+#BiocManager::install("sctransform")
+
+library(Seurat)
+library(ggplot2)
+library(sctransform)
+library(dplyr)
+library(ape)
+#library(variancePartition)
+library(cowplot)
+library(Matrix)
+
+#find out where you are
+getwd()
+dir= "/Users/whippoorwill/Desktop/Sequencing/Nick/2_2020/NickData/CellRanger"
+ #set this to whatever you like, above the level of your data folder
+#setwd(dir)
+```
+
+Tell yourself where the files are 
+
+```{r}
+dataset_loc<-file.path(dir)
+```
+
+Then create an object with the folder names that you can use to open each sample folder when you need it. The following code will allow you to open all the folders in sequence. 
+```{r}
+files = list.files(dataset_loc)
+ids <-files
+```
+
+For each ID (i.e. folder), read in the data and change the colnames as follows:
+
+split the colnames that already exist into a list; then remove anything after "-" (split), then extract only the first element ('[[', index = 1L), then paste the ID to each colname (gene) separated by "-". Return d10x. Repeat for each id. 
+
+```{r}
+d10x.data <- sapply(ids, function(i){
+        d10x <- Read10X(file.path(dataset_loc, i,"filtered_feature_bc_matrix")) #read in the file for id[i]
+        colnames(d10x) <- paste(sapply(strsplit(colnames(d10x),split="-"),'[[',1L),i,sep="-") 
+        d10x
+})
+
+```
+
+
+The d10x.data list object contains a set of lists whose columns consist of cell IDs and whose rows represent genes. 
+Make experiment.data into an array with each element of d10x.data (which is a list) as columns (as many columns as cells per sample)
+This creates a new array that contains all of the cells and genes from d10x.data but puts them in one list instead of 3. 
+
+```{r}
+experiment.data<-do.call("cbind",d10x.data)
+```
+
+"aggregate" the data which cellRanger does but not well. Create a seurat object, keeping genes that are in >3 cells, cells with >50 genes (you can always set these to zero and filter later)
+
+```{r}
+project<-"Nick" #Name this anything you want
+#all of the following fields can be altered. I am not filtering by cells or features; the "names.field" and "names.delim" determines the input identity for each cell. Find out what this will be: 
+colnames(experiment.data)[1:5]
+sobject <- CreateSeuratObject(
+        experiment.data,
+        project = project, 
+        min.cells = 0,
+        min.features = 0,
+        names.field = 2,
+        names.delim = "\\-")
+table(sobject$orig.ident)
+```
+
+Calculate mitochondrial content, add as metadata to each cell (column). Percent mito is literally dividing one matrix by another matrix to get a percentage. Grep searches through rownames of the data (i.e. genes) for anything that starts with mt. 
+
+```{r}
+sobject <- PercentageFeatureSet(sobject, pattern = "^mt-", col.name = "percent.mito")
+```
+
+
+```{r}
+sobject <- PercentageFeatureSet(sobject, pattern = "^rp", col.name = "percent.ribo")
+```
+Extract the sampleIDs which are stored in "orig.ident". The numbers are numbers of cells (columns). Orig.ident is defined by the file from which the data was isolated. 
+
+```{r}
+samplename = sobject$orig.ident
+table(samplename)
+
+
+complement = read.csv("~/Desktop/x.csv",stringsAsFactors = F,header = F)
+complement = complement$V1
+for (gene in complement){
+  if (gene %in% rownames(sobject)){
+    FeaturePlot(sobject,gene)
+  } else {next}
+  
+}
+
+x = read.csv("~/Desktop/GSE86921_CPM_Values.csv",stringsAsFactors = F,sep = ";")
+
+```
+
+add sample descriptions to the column (cell) names for each sample. if you call a name of a cell you can see which sample it's from
+
+```{r}
+#check that the names are levels
+levels(samplename)
+#rename to whatever you like, in order
+levels(samplename) = c("Juvenile A","Adult A","Adult B","Juvenile B") 
+table(samplename)
+#add new metadata column
+sobject$sample_description = samplename
+#check
+table(sobject$sample_description,sobject$orig.ident)
+
+age = sobject$sample_description
+levels(age) = c("Juvenile","Adult","Adult","Juvenile")
+sobject$age = age
+
+individual = sobject$sample_description
+levels(individual) = c("A","A","B","B")
+sobject$individual = individual
+```
+
+
+
+QC - decide on final filtering parameters, look for clear outliers/differences between samples. These are quantiles of cells. Also shows you the variability between cells (and between samples)
+
+5% quantiles for number of genes per cell per sample - nGene is in the metadata for each cell, run quantiles on each sample from 0-1 in increments of 0.05
+
+Show 5% quantiles for mitochondrial genes. Note the large gap between 95%, 100% - maybe filter the top 5% of mt high-expressing cells. But you need to think about what those cells are really doing. Are they dead? Highly active/reactive? 
+
+```{r}
+title = "nCount"
+title
+do.call("cbind", tapply(sobject$nCount_RNA,sobject$sample_description,quantile,probs=seq(0,1,0.05)))
+title = "nGene"
+title
+do.call("cbind", tapply(sobject$nFeature_RNA,sobject$sample_description,quantile,probs=seq(0,1,0.05)))
+title = "%mt-RNA"
+title
+round(do.call("cbind", tapply(sobject$percent.mito,sobject$sample_description,quantile,probs=seq(0,1,0.05))), digits = 3)
+
+title = "%ribo-RNA"
+title
+round(do.call("cbind", tapply(sobject$percent.ribo,sobject$sample_description,quantile,probs=seq(0,1,0.05))), digits = 3)
+```
+
+Make graphs that show the distribution of genes, counts, % mt
+```{r}
+VlnPlot(sobject,features = c("nCount_RNA"),group.by = "age",split.by = "individual",pt.size = 0.001)
+VlnPlot(sobject,features = c("percent.mito"),group.by = "age",split.by = "individual",pt.size = 0.001)
+VlnPlot(sobject,features = c("percent.ribo"),group.by = "age",split.by = "individual",pt.size = 0.001)
+VlnPlot(sobject,features = c("nFeature_RNA"),group.by = "age",split.by = "individual",pt.size = 0.001)
+
+VlnPlot(sobject,features = c("nCount_RNA"),group.by = "age",split.by = "individual",pt.size = 0)
+VlnPlot(sobject,features = c("percent.mito"),group.by = "age",split.by = "individual",pt.size = 0)
+VlnPlot(sobject,features = c("percent.ribo"),group.by = "age",split.by = "individual",pt.size = 0)
+VlnPlot(sobject,features = c("nFeature_RNA"),group.by = "age",split.by = "individual",pt.size = 0)
+
+setwd("~/Desktop/Sequencing/Nick/2_2020/NickData/QC")
+setEPS()
+postscript("agedots.eps")
+VlnPlot(sobject,features = c("nCount_RNA"),group.by = "age",split.by = "individual",pt.size = 0.001)
+dev.off()
+
+setEPS()
+postscript("mitodots.eps")
+VlnPlot(sobject,features = c("percent.mito"),group.by = "age",split.by = "individual",pt.size = 0.001)
+dev.off()
+
+setEPS()
+postscript("ribodots.eps")
+VlnPlot(sobject,features = c("percent.ribo"),group.by = "age",split.by = "individual",pt.size = 0.001)
+dev.off()
+
+setEPS()
+postscript("featuredots.eps")
+VlnPlot(sobject,features = c("nFeature_RNA"),group.by = "age",split.by = "individual",pt.size = 0.001)
+dev.off()
+
+
+setEPS()
+postscript("age.eps")
+VlnPlot(sobject,features = c("nCount_RNA"),group.by = "age",split.by = "individual",pt.size = 0)
+dev.off()
+setEPS()
+
+postscript("mito.eps")
+VlnPlot(sobject,features = c("percent.mito"),group.by = "age",split.by = "individual",pt.size = 0)
+dev.off()
+
+setEPS()
+postscript("ribo.eps")
+VlnPlot(sobject,features = c("percent.ribo"),group.by = "age",split.by = "individual",pt.size = 0)
+dev.off()
+
+setEPS()
+postscript("feature.eps")
+VlnPlot(sobject,features = c("nFeature_RNA"),group.by = "age",split.by = "individual",pt.size = 0)
+dev.off()
+```
+Plot the number of cells each gene is represented by - i.e. how many cells express any given gene? Ordered from rare to common genes. So you might consider focusing on genes that are relatively well expressed across the sample, or you might care about genes expressed only in a small subset of cells. The >=2 refers to read number per cell. 
+```{r}
+plot(sort(Matrix::rowSums(GetAssayData(sobject)>=2)),xlab="gene rank",ylab="number of cells",main="Cells per genes ( >= 2 )")
+```
+Gene Plot, scatter plot of gene expression across cells, (colored by sample) - sequencing depth relative to genes; looking for similarity across samples. Some cell types can have relatively few genes, but highly expressed, could show up as a second arc below the one seen here (should contain all samples though)
+```{r}
+Idents(sobject) = "sample_description"
+FeatureScatter(sobject, "nCount_RNA", "nFeature_RNA")
+FeatureScatter(sobject, "nCount_RNA", "percent.mito")
+FeatureScatter(object=sobject,"nFeature_RNA","percent.mito")
+FeatureScatter(object=sobject,"percent.ribo","percent.mito")
+
+setwd("~/Desktop/Sequencing/Nick/2_2020/NickData/QC")
+setEPS()
+postscript("ncount_nfeature.eps")
+FeatureScatter(sobject, "nCount_RNA", "nFeature_RNA")
+dev.off()
+
+setEPS()
+postscript("ncount_percentmito.eps")
+FeatureScatter(sobject, "nCount_RNA", "percent.mito")
+dev.off()
+
+setEPS()
+postscript("nfeature_percentmito.eps")
+FeatureScatter(object=sobject,"nFeature_RNA","percent.mito")
+dev.off()
+
+setEPS()
+postscript("percentribo_percentmito.eps")
+FeatureScatter(object=sobject,"percent.ribo","percent.mito")
+dev.off()
+```
+Set limits based on the graphs
+```{r}
+mlo = -0.1
+mhi = 10
+clo = 1200
+chi = 15000
+flo = 500
+fhi = 3000
+```
+
+Violin plot of 1) number of genes, 2) number of UMI and 3) percent mitochondrial genes; save with lines that show cutoffs
+```{r}
+setwd("~/Desktop/Sequencing/Nick/2_2020/NickData/QC") #save the graphs somewhere; will only change directory during this chunk
+setEPS()
+postscript("nFeature_RNAall.eps")
+VlnPlot(
+  sobject,
+  c("nFeature_RNA"),group.by = "age",split.by = "individual",
+  pt.size = 0) + geom_abline(intercept = fhi, slope = 0, linetype = "dashed",color = "red", size = .8) + geom_abline(intercept = flo, slope = 0, linetype = "dashed",color = "black", size = .8)
+dev.off()
+
+setEPS()
+postscript("nCount_RNAall.eps")
+VlnPlot(
+  sobject,
+  c("nCount_RNA"),group.by = "age",split.by = "individual",
+  pt.size = 0) + geom_abline(intercept = chi, slope = 0, linetype = "dashed",color = "red", size = .8) + geom_abline(intercept = clo, slope = 0, linetype = "dashed",color = "black", size = .8)
+dev.off()
+
+setEPS()
+postscript("percentmito_all.eps")
+VlnPlot(
+  sobject,
+  c("percent.mito"),group.by = "age",split.by = "individual",
+  pt.size = 0)+ geom_abline(intercept = mhi, slope = 0, linetype = "dashed",color = "red", size = .8) + geom_abline(intercept = mlo, slope = 0, linetype = "dashed",color = "black", size = .8)
+dev.off()
+
+VlnPlot(sobject,c("nFeature_RNA"),group.by = "age",split.by = "individual", pt.size = 0) + geom_abline(intercept = fhi, slope = 0, linetype = "dashed",color = "red", size = .8) + geom_abline(intercept = flo, slope = 0, linetype = "dashed",color = "black", size = .8)
+
+VlnPlot(
+  sobject,
+  c("nCount_RNA"),group.by = "age",split.by = "individual",
+  pt.size = 0) + geom_abline(intercept = chi, slope = 0, linetype = "dashed",color = "red", size = .8) + geom_abline(intercept = clo, slope = 0, linetype = "dashed",color = "black", size = .8)
+
+VlnPlot(
+  sobject,
+  c("percent.mito"),group.by = "age",split.by = "individual",
+  pt.size = 0)+ geom_abline(intercept = mhi, slope = 0, linetype = "dashed",color = "red", size = .8) + geom_abline(intercept = mlo, slope = 0, linetype = "dashed",color = "black", size = .8)
+
+VlnPlot(
+  sobject,group.by = "age",split.by = "individual",
+  c("percent.ribo"),
+  pt.size = 0)
+```
+```{r}
+Idents(sobject) = "sample_description"
+FeatureScatter(sobject, "nCount_RNA", "nFeature_RNA") + geom_vline(xintercept = clo, linetype = "dashed",color = "black", size = .8) + geom_hline(yintercept = flo, linetype = "dashed",color = "black", size = .8) + geom_vline(xintercept = chi, linetype = "dashed",color = "red", size = .8) + geom_hline(yintercept = fhi, linetype = "dashed",color = "red", size = .8)
+
+FeatureScatter(sobject, "nCount_RNA", "percent.mito") + geom_vline(xintercept = clo, linetype = "dashed",color = "black", size = .8) + geom_hline(yintercept = mlo, linetype = "dashed",color = "black", size = .8) + geom_vline(xintercept = chi, linetype = "dashed",color = "red", size = .8) + geom_hline(yintercept = mhi, linetype = "dashed",color = "red", size = .8)
+
+FeatureScatter(object=sobject,"nFeature_RNA","percent.mito")+ geom_vline(xintercept = flo, linetype = "dashed",color = "black", size = .8) + geom_hline(yintercept = mlo, linetype = "dashed",color = "black", size = .8) + geom_vline(xintercept = fhi, linetype = "dashed",color = "red", size = .8) + geom_hline(yintercept = mhi, linetype = "dashed",color = "red", size = .8)
+
+FeatureScatter(object=sobject,"percent.ribo","percent.mito")+  geom_hline(yintercept = mlo, linetype = "dashed",color = "black", size = .8)+ geom_hline(yintercept = mhi, linetype = "dashed",color = "red", size = .8)
+
+
+```
+
+
+
+Filtering cells: note that they are taking these filters and duplicating them across all samples. Use -Inf instead of 0 because not all the filters have to be positive values, and to avoid any errors due to truncation. 
+
+How to select filters??? noise vs signal - get them from the violin plots and the matrix, capture the bulk of cells but exclude outliers (say with mtDNA filter) - can also look at percentiles, maybe get rid of top 5% since it was very different from the rest. Basically eliminate outliers and don't include cells that have hardly any genes or have a ton of genes expressed. First save the original object: 
+
+```{r}
+save(sobject,file = file.path("~/Desktop/Sequencing/Nick/2_2020/NickData/Data/Nick2020_unfiltered.RData"))
+```
+
+
+
+

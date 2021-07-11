@@ -1,0 +1,575 @@
+---
+title: "Seurat_Code_LD_2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+
+```{r}
+#install.packages("BiocManager")
+
+#BiocManager::install("Seurat")
+#BiocManager::install("ggplot2")
+#BiocManager::install("sctransform")
+
+library(Seurat)
+library(ggplot2)
+library(sctransform)
+library(dplyr)
+library(ape)
+#library(variancePartition)
+library(cowplot)
+library(Matrix)
+
+#find out where you are
+getwd()
+dir= "/Users/whippoorwill/Desktop/Sequencing/Nick/2_2020/NickData"
+ #set this to whatever you like, above the level of your data folder
+#setwd(dir)
+```
+
+Select only P28 samples: 
+
+```{r}
+#load("/Users/whippoorwill/Desktop/Sequencing/Nick/2_2020/NickData/Data/sobject_filtered_1200_umap.RData")
+sobject
+sobject = subset(sobject,subset = age == "Juvenile")
+sobject
+```
+
+```{r}
+sobject <- NormalizeData(sobject,normalization.method = "LogNormalize", scale.factor = 10000)
+#select some housekeeping genes
+genes = c("mpeg1.1") 
+VlnPlot(sobject,genes,group.by = "sample_description")
+GetAssayData(sobject)[1:10, 1:15]
+table(sobject$sample_description)
+```
+
+
+Filtering out genes in Seurat - use AFTER normalization. Works on data object (i.e. normalized, filtered data). 
+Option A: standard
+
+```{r}
+sobject<-FindVariableFeatures(sobject, selection.method = "vst", nfeatures = 6000)
+top10 <- head(VariableFeatures(sobject),10)
+plot1 <- VariableFeaturePlot(sobject)
+plot2 <- LabelPoints(plot=plot1, points = top10, repel = T, xnudge = 0, ynudge = 0)
+plot2
+```
+
+Scale the data
+```{r}
+all.genes<-rownames(sobject)
+var.genes = VariableFeatures(sobject)
+add.genes = c('fcrls', 'olfml3', 'lgmn', 'cx3cr1', 'hexb','apoeb')
+add.genes = add.genes[!add.genes %in% var.genes]
+any(add.genes %in% var.genes)
+scalegenes = c(var.genes,add.genes)
+
+sobject<-ScaleData(sobject,features = scalegenes, vars.to.regress = c("nFeature_RNA"))
+```
+
+Dimensionality reduction. Note that UMAP can be run directly on most variable features as well, but this will take forever unless you severely restrict #genes. 
+```{r}
+sobject <- RunPCA(sobject,features = scalegenes,npcs = 50, verbose = FALSE)
+set.seed(1)
+#figure out how many PCs to use - can default to 30
+ElbowPlot(sobject,ndims = 50, reduction = "pca")
+print(sobject[["pca"]], dims = 1:20, nfeatures = 5)
+#look for heat shock proteins or Malat1
+FeaturePlot(sobject,"percent.mito",reduction = "pca",dims = 3:4 )
+```
+
+
+```{r}
+sobject<-RunUMAP(sobject,reduction = "pca",dims = 1:30, verbose = F)
+sobject<-FindNeighbors(sobject,dims=1:30,verbose=F)
+set.seed(1)
+res = seq(0.5,3,by = 0.5) #set this to anything
+sobject<-FindClusters(sobject,verbose=F,resolution = 0.3) 
+#save(sobject,file = "~/Desktop/Sequencing/Nick/2_2020/NickData/Data/strict_juvenile.RData")
+```
+
+
+Function to print multiple graphs: 
+
+```{r}
+PrintSeuratGraph = function(namecard = "a",sobject,graphtype = "feature",colors = c("lightgrey","lightblue","yellow","orange","darkorange","red"), feature = NULL,group = NULL,split=NULL,cellnames=NULL,sort = F){
+  if (!is.null(cellnames)){
+    Idents(sobject) = cellnames[1]
+    cells = colnames(sobject)[Idents(sobject) %in% cellnames[2:length(cellnames)]]} 
+  else {cells = cellnames}
+  if (graphtype == "feature"){
+    graph = FeaturePlot(sobject,features = feature,split.by = split, cells = cells,cols = colors)
+  }
+  if (graphtype == "violin"){
+    graph = VlnPlot(sobject,features = feature, pt.size = 0.1, idents = cellnames[2:length(cellnames)],group.by = group, split.by = split)
+  }
+  if (graphtype == "dim"){
+    graph = DimPlot(sobject,cells = cells, group.by = group, split.by = split)
+    
+  }
+  name = paste0(feature,"_",graphtype,namecard,".eps")
+  graph
+  setEPS()
+  postscript(file.path("~/Desktop",name))
+  print(graph)
+  dev.off()
+}
+
+```
+
+```{r}
+DimPlot(sobject,label=T,reduction = "umap")
+genes = c("marco","mpeg1.1","apoeb","apoea","p2ry12","ptprc","hexb","irf8","spi1b","spi1a","csf1ra","csf1rb","slc7a7","c1qa","c1qb","c1qc")
+
+features = c("percent.mito","percent.ribo","nCount_RNA","nFeature_RNA")
+genesHB = c("ccl19a.1","wipf1a","b2m","plp1b","krt18b","cxcr4b","cd74b","cd74a","gpatch8","mhc2dab","ms4a17a.6","cdc42l","dhrs9","bzw1b","lygl1","hmga1a","top1l","plekho2")
+
+genesOT = c("bzw2","slc40a1","g0s2","ctsla","eepd1","slc43a2b","apoeb","pitpnaa","rnaset2","mt2","ctsz","cndp2","dpp7","abca1a","pdgfd","ctsd","pepd","mafbb","ppdpfb","slc7a7","glud1b","porb","galk1","bri3","glula","abhd12","ubb","rgl1","mpp1","hmgb3a","abca1b","ctsba","ctsc","vat1")
+
+length(genesOT)
+
+
+
+genes = genes[genes %in% scalegenes]
+FeaturePlot(sobject,genes[1:5],reduction = "umap")
+FeaturePlot(sobject,genes[6:9], reduction = "umap")
+FeaturePlot(sobject,features = "percent.mito")
+FeaturePlot(sobject,features = "nCount_RNA")
+FeaturePlot(sobject,features = "nFeature_RNA")
+FeaturePlot(sobject,features = "percent.ribo")
+DimPlot(sobject,group.by = "individual")
+
+for(feature in c(genes,features)){
+  PrintSeuratGraph(namecard = "Juvenile",sobject=sobject,graphtype = "feature",feature = feature)
+}
+genes = c("cd4-1", "lck", "ccr9a", "il2rb", "bcl2l10","il13", "eomesa")
+
+groups = c("age","sample_description","seurat_clusters")
+
+for(group in groups){
+  PrintSeuratGraph(namecard = "Juvenile",sobject=sobject,graphtype = "dim",group = group, feature = group)
+}
+
+genes = c("apoeb", "p2ry12", "hexb", "csf1rb", "irf8", "slc7a7","mpeg1.1","ptprc")
+
+for (gene in genes){
+  PrintSeuratGraph(namecard = "juvenile-all",sobject=sobject,graphtype = "violin",group = "seurat_clusters", feature = gene)
+}
+
+for (gene in genes){
+  PrintSeuratGraph(namecard = "juvenile-all",sobject=sobject,graphtype = "feature",group = "seurat_clusters", feature = gene)
+}
+
+DimPlot(sobject,group.by = "seurat_clusters",label = T)
+```
+
+
+
+```{r}
+DimPlot(sobject,reduction = "umap",group.by = "sample_description")
+DimPlot(sobject,reduction = "umap",group.by = "sample_description",split.by = "age")
+DimPlot(sobject,reduction = "umap",group.by = "seurat_clusters",split.by = "sample_description",label = T)
+```
+#The clusters are stored in "seurat_clusters", with multiple clustering algorithms stored as metadata columns. 
+```{r}
+x = table(sobject$individual,sobject$seurat_clusters)
+ratio = x[1,]/x[2,]*100
+b = round(rbind(x,ratio),0)
+b
+mean(b[3,])
+barplot(x,legend.text = T)
+```
+
+```{r}
+Idents(sobject) = "seurat_clusters"
+sobject= BuildClusterTree(sobject,dims = 1:30)
+tree = sobject@tools$BuildClusterTree
+setEPS()
+postscript("~/Desktop/tree_juvenile.eps")
+plot.phylo(tree, use.edge.length = T, direction = "rightwards")
+dev.off()
+```
+
+Heatmap for sobject
+```{r}
+Idents(sobject) = "seurat_clusters"
+markers_all <- FindAllMarkers(
+    object = sobject,
+    features = var.genes,
+    only.pos = FALSE, 
+    min.pct = 0.25, #gene must be present in 25% of the cells in the cluster
+    logfc.threshold = 0.20
+)
+
+dim(markers_all)
+head(markers_all)
+write.csv(markers_all,file = "~/Desktop/juvenile_markers.csv")
+
+markers_all_single <- markers_all[markers_all$gene %in% names(table(markers_all$gene))[table(markers_all$gene) == 1],] #markers that define a single cluster
+
+pcut = 10^-50
+markers_all_single_thresh = markers_all_single[markers_all_single$p_val_adj<pcut,]
+
+topgenes <- markers_all_single %>% group_by(cluster) %>% top_n(10, avg_logFC)
+
+setEPS()
+postscript("~/Desktop/heatmap_juvenile_pval50.eps")
+DoHeatmap(
+    object = sobject, 
+    features = topgenes$gene,
+    group.by = 'seurat_clusters',
+    size = 5,
+    label = T,
+    draw.lines = T
+)
+
+dev.off()
+```
+
+///////Start juvenile microglia only/////////
+Juvenile microglia: using "genes" above, clusters 0,2,12,5,6
+
+Load in juvenile: 
+
+```{r}
+load("/Users/whippoorwill/Desktop/Sequencing/Nick/2_2020/NickData/Data/strict_juvenile.RData")
+sobject
+```
+Define what separates clusters 0,2,12,5,6 from all the rest: 
+
+```{r}
+DimPlot(sobject,label = T)
+plot.phylo(tree, use.edge.length = T, direction = "rightwards")
+```
+Name microglia
+```{r}
+celltypes = sobject$seurat_clusters
+microglia = c(0,2,5,6,12)
+levels(celltypes)[microglia+1] = "microglia"
+levels(celltypes)[levels(celltypes)!="microglia"] = "other"
+levels(celltypes)
+table(celltypes)
+sobject$celltypes = celltypes
+table(sobject$celltypes,sobject$seurat_clusters)
+sobject$celltypecluster = paste0(sobject$celltypes,"_",sobject$seurat_clusters)
+```
+
+Find markers of microglia
+
+```{r}
+length(scalegenes)
+Idents(sobject) = "celltypes"
+markers_all = FindMarkers(sobject,ident.1 = "microglia",ident.2 = "other",features = var.genes,test.use = "MAST",min.pct = 0.10,logfc.threshold = 0,only.pos = F)
+```
+
+```{r}
+dim(markers_all)
+head(markers_all)
+write.csv(markers_all,file = "~/Desktop/microglia_juvenile_markers_new.csv")
+
+pcut = 10^-50
+markers_thresh = markers_all[markers_all$p_val_adj<pcut,]
+topgenes <- markers_all[order(markers_all$avg_logFC,decreasing = T),]
+hgenes = rownames(topgenes[c(1:20,(nrow(topgenes)-19):nrow(topgenes)),])
+hgenes
+
+setEPS()
+postscript("~/Desktop/heatmap_juv_micro_bytype_new.eps")
+DoHeatmap(
+    object = sobject, 
+    features = hgenes,
+    group.by = 'celltypecluster',
+    size = 5,
+    label = T,
+    draw.lines = T
+)
+
+dev.off()
+```
+```{r}
+save(sobject,file = "~/Desktop/strict_juvenile.RData")
+```
+
+
+Subset the data to only include microglia
+```{r}
+sobject = subset(sobject,subset = celltypes == "microglia")
+```
+
+
+```{r}
+sobject <- NormalizeData(sobject,normalization.method = "LogNormalize", scale.factor = 10000)
+#select some housekeeping genes
+genes = c("mpeg1.1") 
+VlnPlot(sobject,genes,group.by = "sample_description")
+GetAssayData(sobject)[1:10, 1:15]
+table(sobject$sample_description)
+```
+
+
+Filtering out genes in Seurat - use AFTER normalization. Works on data object (i.e. normalized, filtered data). 
+Option A: standard
+
+```{r}
+sobject<-FindVariableFeatures(sobject, selection.method = "vst", nfeatures = 6000)
+top10 <- head(VariableFeatures(sobject),10)
+plot1 <- VariableFeaturePlot(sobject)
+plot2 <- LabelPoints(plot=plot1, points = top10, repel = T, xnudge = 0, ynudge = 0)
+plot2
+```
+
+Scale the data
+```{r}
+all.genes<-rownames(sobject)
+var.genes = VariableFeatures(sobject)
+add.genes = c('fcrls', 'olfml3', 'lgmn', 'cx3cr1', 'hexb','apoeb')
+add.genes = add.genes[!add.genes %in% var.genes]
+any(add.genes %in% var.genes)
+scalegenes = c(var.genes,add.genes)
+
+sobject<-ScaleData(sobject,features = scalegenes, vars.to.regress = c("nFeature_RNA"))
+```
+
+Dimensionality reduction. Note that UMAP can be run directly on most variable features as well, but this will take forever unless you severely restrict #genes. 
+```{r}
+sobject <- RunPCA(sobject,features = scalegenes,npcs = 50, verbose = FALSE)
+set.seed(1)
+#figure out how many PCs to use - can default to 30
+ElbowPlot(sobject,ndims = 50, reduction = "pca")
+print(sobject[["pca"]], dims = 1:20, nfeatures = 5)
+#look for heat shock proteins or Malat1
+FeaturePlot(sobject,"percent.mito",reduction = "pca",dims = 1:2 )
+```
+
+
+```{r}
+set.seed(1)
+sobject<-RunUMAP(sobject,reduction = "pca",dims = 1:30, verbose = F)
+sobject<-FindNeighbors(sobject,dims=1:30,verbose=F)
+set.seed(1)
+res = seq(0.5,3,by = 0.5) #set this to anything
+sobject<-FindClusters(sobject,verbose=F,resolution = 0.3) 
+save(sobject,file = "~/Desktop/Sequencing/Nick/2_2020/NickData/Data/juvenile_microglia_new.RData")
+```
+
+
+```{r}
+DimPlot(sobject,label=T,reduction = "umap")
+genes = c("marco","mpeg1.1","apoeb","apoea","p2ry12","ptprc","hexb","irf8","spi1b","spi1a","csf1ra","csf1rb","slc7a7","c1qa","c1qb","c1qc")
+
+genes = genes[genes %in% scalegenes]
+FeaturePlot(sobject,genes[1:5],reduction = "umap")
+FeaturePlot(sobject,genes[6:9], reduction = "umap")
+FeaturePlot(sobject,features = "percent.mito")
+FeaturePlot(sobject,features = "percent.ribo")
+FeaturePlot(sobject,features = "nCount_RNA")
+FeaturePlot(sobject,features = "nFeature_RNA")
+DimPlot(sobject,group.by = "individual")
+DimPlot(sobject,group.by = "seurat_clusters")
+
+
+for(feature in c(genes,"percent.mito","percent.ribo","nCount_RNA","nFeature_RNA")){
+  PrintSeuratGraph(namecard = "micro_juvenile_new",sobject=sobject,graphtype = "feature",feature = feature)
+}
+
+groups = c("sample_description","seurat_clusters","celltypecluster")
+groups = c("seurat_clusters","kind")
+for(group in groups){
+  PrintSeuratGraph(namecard = "all_juvenile_new",sobject=sobject,graphtype = "dim",group = group, feature = group)
+}
+
+```
+
+```{r}
+Idents(sobject) = "seurat_clusters"
+sobject= BuildClusterTree(sobject,dims = 1:30)
+tree = sobject@tools$BuildClusterTree
+setEPS()
+postscript("~/Desktop/tree_micro_juvenile_new.eps")
+plot.phylo(tree, use.edge.length = T, direction = "rightwards")
+dev.off()
+```
+
+
+Heatmap for sobject
+```{r}
+Idents(sobject) = "seurat_clusters"
+markers_all <- FindAllMarkers(
+    object = sobject,
+    features = var.genes,
+    only.pos = FALSE, 
+    min.pct = 0.25, #gene must be present in 25% of the cells in the cluster
+    logfc.threshold = 0.20
+)
+
+dim(markers_all)
+head(markers_all)
+write.csv(markers_all,file = "~/Desktop/juvenile_withinmicro_markers_new.csv")
+
+markers_all_single <- markers_all[markers_all$gene %in% names(table(markers_all$gene))[table(markers_all$gene) == 1],] #markers that define a single cluster
+
+pcut = 10^-50
+markers_all_single_thresh = markers_all_single[markers_all_single$p_val_adj<pcut,]
+
+topgenes <- markers_all_single %>% group_by(cluster) %>% top_n(10, avg_logFC)
+
+setEPS()
+postscript("~/Desktop/heatmap_micro_withinmicro_new.eps")
+DoHeatmap(
+    object = sobject, 
+    features = topgenes$gene,
+    group.by = 'seurat_clusters',
+    size = 5,
+    label = T,
+    draw.lines = T
+)
+
+dev.off()
+```
+
+Differential expression analysis
+```{r}
+Idents(sobject) = "cluster_region"
+markers_all <- FindAllMarkers(
+    object = sobject,
+    features = rownames(GetAssayData(sobject,slot = "scale.data")),
+    test.use = "MAST",
+    only.pos = FALSE, 
+    min.pct = 0.05, #gene must be present in 25% of the cells in the cluster
+    logfc.threshold = 0
+)
+
+dim(markers_all)
+head(markers_all)
+write.csv(markers_all,file = "~/Desktop/Sequencing/Nick/2_2020/Graphs_Analysis_August2020/Juvenile/microglia/juvenile_withinmicro_markers_riboregression.csv")
+
+```
+
+
+```{r}
+genesHB = c("ccl19a.1","wipf1a","b2m","plp1b","krt18b","cxcr4b","cd74b","cd74a","gpatch8","mhc2dab","ms4a17a.6","cdc42l","dhrs9","bzw1b","lygl1","hmga1a","top1l","plekho2")
+
+genesOT = c("bzw2","slc40a1","g0s2","ctsla","eepd1","slc43a2b","apoeb","pitpnaa","rnaset2","mt2","ctsz","cndp2","dpp7","abca1a","pdgfd","ctsd","pepd","mafbb","ppdpfb","slc7a7","glud1b","porb","galk1","bri3","glula","abhd12","ubb","rgl1","mpp1","hmgb3a","abca1b","ctsba","ctsc","vat1")
+
+#High in HB and then follows the gradient, HB>MB>OT)
+genesHB_MB_OT = c("ccl19a.1","cd74a","cd74b","batf3","siglec15l","hepacam2","chl1a","mhc2dab","b2m")
+
+#High in OT and then follows the gradient OT>MB>HB) lowest expression in HB
+genesOT_MB_HB = c("apoeb","glula","ccl34b.1","psap","abhd12","bzw2","g0s2","slc40a1")
+
+
+
+VlnPlot(sobject,genesHB[1:12],group.by = "seurat_clusters",split.by = "sample_description",pt.size = 0)
+
+VlnPlot(sobject,genesHB[12:length(genesHB)],group.by = "seurat_clusters",split.by = "sample_description",pt.size = 0)
+
+VlnPlot(sobject,genesOT[1:12],group.by = "seurat_clusters",split.by = "sample_description",pt.size = 0)
+
+VlnPlot(sobject,genesOT[13:24],group.by = "seurat_clusters",split.by = "sample_description",pt.size = 0)
+
+
+
+VlnPlot(sobject,genesHB_MB_OT,group.by = "seurat_clusters",split.by = "sample_description",pt.size = 0)
+
+VlnPlot(sobject,genesOT_MB_HB,group.by = "seurat_clusters",split.by = "sample_description",pt.size = 0)
+
+FeaturePlot(sobject,genesHB_MB_OT,pt.size = 0)
+DimPlot(sobject,group.by = "seurat_clusters")
+plot.phylo(tree, use.edge.length = T, direction = "rightwards")
+FeaturePlot(sobject,genesOT_MB_HB,pt.size = 0)
+```
+
+
+```{r}
+#High in HB and then follows the gradient, HB>MB>OT)
+genesHB_MB_OT = c("ccl19a.1","cd74a","cd74b","batf3","siglec15l","hepacam2","chl1a","mhc2dab","b2m")
+
+#High in OT and then follows the gradient OT>MB>HB) lowest expression in HB
+genesOT_MB_HB = c("apoeb","glula","ccl34b.1","psap","abhd12","bzw2","g0s2","slc40a1")
+
+FeatureScatter(sobject,genesHB_MB_OT[1],genesHB_MB_OT[2],group.by = "seurat_clusters")
+FeatureScatter(sobject,genesHB_MB_OT[2],genesHB_MB_OT[3],group.by = "seurat_clusters")
+FeatureScatter(sobject,genesHB_MB_OT[3],genesHB_MB_OT[4],group.by = "seurat_clusters")
+FeatureScatter(sobject,genesHB_MB_OT[4],genesHB_MB_OT[5],group.by = "seurat_clusters")
+FeatureScatter(sobject,genesHB_MB_OT[5],genesHB_MB_OT[6],group.by = "seurat_clusters")
+FeatureScatter(sobject,genesHB_MB_OT[7],genesHB_MB_OT[8],group.by = "seurat_clusters")
+FeatureScatter(sobject,genesHB_MB_OT[8],genesHB_MB_OT[9],group.by = "seurat_clusters")
+
+for (i in 1:(length(genesOT_MB_HB)-1)){
+  print(FeatureScatter(sobject,genesOT_MB_HB[i],genesOT_MB_HB[(i+1)],group.by = "seurat_clusters"))
+}
+```
+
+
+
+```{r}
+bulkmarkers = read.csv("/Users/whippoorwill/Desktop/Sequencing/Nick/2_2020/NickData/bulk DE genes - OTvHB/DEgenesOTvsHB_MergedLanes_NS.csv",stringsAsFactors = F,fill= T)
+markers_all = read.csv("/Users/whippoorwill/Desktop/Sequencing/Nick/2_2020/new/Juvenile/microglia/juvenile_withinmicro_markers_new.csv",stringsAsFactors = F,fill = T)
+markers_all = markers_all[markers_all$avg_logFC>0.2 & markers_all$p_val_adj < 0.001,]
+"markers by cluster"
+table(markers_all$cluster)
+
+"cells by cluster"
+table(sobject$seurat_clusters)
+allgenes = bulkmarkers[bulkmarkers$padj<0.01,] 
+HBgenes = allgenes[allgenes$log2FoldChange < -2,] #downregulated OT vs HB
+OTgenes = allgenes[allgenes$log2FoldChange > 2,] #upregulated OT vs HB
+"HBgenes"
+dim(HBgenes)
+"OTgenes"
+dim(OTgenes)
+
+HB = markers_all[markers_all$gene %in% HBgenes$Gene_ID,]
+OT = markers_all[markers_all$gene %in% OTgenes$Gene_ID,]
+
+"HB genes per cluster"
+table(HB$cluster)
+
+"OT genes per cluster"
+table(OT$cluster)
+```
+
+
+```{r}
+degenes = read.csv("/Users/whippoorwill/Desktop/Sequencing/Nick/2_2020/new/Juvenile/microglia/juvenile_withinmicro_markers_new.csv",stringsAsFactors = F,fill = T)
+#degenes = degenes[degenes$cluster %in% c(0,1),]
+degenesOT = degenes[degenes$X %in% genesOT,]
+table(degenesOT$cluster)
+
+degenesHB = degenes[degenes$X %in% genesHB,]
+table(degenesHB$cluster)
+```
+
+
+Make a new umap plot for scvelo
+```{r}
+load(file = "~/Desktop/Sequencing/Nick/2_2020/NickData/Data/strict_juvenile.RData")
+n=50L
+d = 1
+s = 1
+sobject<-RunUMAP(sobject,reduction = "pca",dims = 1:30, verbose = F,n.neighbors = n,min.dist =d, spread =s)
+#defaults:30L, 0.3, 1
+#best: 50L, 0.5, 1
+```
+```{r}
+DimPlot(sobject,group.by = "celltypecluster")
+```
+
+```{r}
+umap = sobject@reductions$umap@cell.embeddings
+write.csv(umap,file = "~/Desktop/Jupyter/velocity_Nick/umap_juvenile_mindist1_50L.csv")
+```
+
+```{r}
+save(sobject,file = "~/Desktop/Sequencing/Nick/2_2020/NickData/Data/strict_juvenile_scvelo.RData")
+
+```
+
