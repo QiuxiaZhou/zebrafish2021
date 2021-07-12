@@ -1,0 +1,85 @@
+Align samples with STAR (if unpacked):
+gunzip HB_1_merged.fastq.gz  
+gunzip HB_2_merged.fastq.gz  
+gunzip OT_1_merged.fastq.gz
+gunzip HB_3_merged.fastq.gz  
+gunzip OT_2_merged.fastq.gz
+gunzip HB_4_merged.fastq.gz  
+gunzip OT_3_merged.fastq.gz
+gunzip OT_4_merged.fastq.gz
+gunzip MD_1_merged.fastq.gz  
+gunzip Tel_1_merged.fastq.gz
+gunzip MD_2_merged.fastq.gz  
+gunzip Tel_2_merged.fastq.gz
+gunzip MD_3_merged.fastq.gz  
+gunzip Tel_3_merged.fastq.gz
+gunzip MD_4_merged.fastq.gz  
+gunzip Tel_4_merged.fastq.gz
+
+NEW:
+
+STAR --runThreadN 6 --runMode alignReads --outFilterMultimapNmax 1 --outSAMattrIHstart 0 --outSAMstrandField intronMotif --outFilterIntronMotifs RemoveNoncanonical --outSAMtype BAM SortedByCoordinate --genomeDir /media/sf_Ubuntu/Genomes/Generated_Genome_64_STAR_Zebrafish/ --outFileNamePrefix /media/sf_Ubuntu/DATA/STARoutput_BAMcoordinate/Tel_1  --readFilesIn /media/sf_Ubuntu/DATA/Tel_1_merged.fastq
+
+STAR --runThreadN 6 --runMode alignReads --outFilterMultimapNmax 1 --outSAMattrIHstart 0 --outSAMstrandField intronMotif --outFilterIntronMotifs RemoveNoncanonical --outSAMtype BAM SortedByCoordinate --genomeDir /media/sf_Ubuntu/Genomes/Generated_Genome_64_STAR_Zebrafish/ --outFileNamePrefix /media/sf_Ubuntu/DATA/STARoutput_BAMcoordinate/Tel_2  --readFilesIn /media/sf_Ubuntu/DATA/Tel_2_merged.fastq
+
+STAR --runThreadN 6 --runMode alignReads --outFilterMultimapNmax 1 --outSAMattrIHstart 0 --outSAMstrandField intronMotif --outFilterIntronMotifs RemoveNoncanonical --outSAMtype BAM SortedByCoordinate --genomeDir /media/sf_Ubuntu/Genomes/Generated_Genome_64_STAR_Zebrafish/ --outFileNamePrefix /media/sf_Ubuntu/DATA/STARoutput_BAMcoordinate/Tel_3  --readFilesIn /media/sf_Ubuntu/DATA/Tel_3_merged.fastq
+
+STAR --runThreadN 6 --runMode alignReads --outFilterMultimapNmax 1 --outSAMattrIHstart 0 --outSAMstrandField intronMotif --outFilterIntronMotifs RemoveNoncanonical --outSAMtype BAM SortedByCoordinate --genomeDir /media/sf_Ubuntu/Genomes/Generated_Genome_64_STAR_Zebrafish/ --outFileNamePrefix /media/sf_Ubuntu/DATA/STARoutput_BAMcoordinate/Tel_4  --readFilesIn /media/sf_Ubuntu/DATA/Tel_4_merged.fastq
+
+STAR --runThreadN 6 --runMode alignReads --outFilterMultimapNmax 1 --outSAMattrIHstart 0 --outSAMstrandField intronMotif --outFilterIntronMotifs RemoveNoncanonical --outSAMtype BAM SortedByCoordinate --genomeDir /media/sf_Ubuntu/Genomes/Generated_Genome_64_STAR_Zebrafish/ --outFileNamePrefix /media/sf_Ubuntu/DATA/STARoutput_BAMcoordinate/OT_1  --readFilesIn /media/sf_Ubuntu/DATA/OT_1_merged.fastq
+
+STAR --runThreadN 6 --runMode alignReads --outFilterMultimapNmax 1 --outSAMattrIHstart 0 --outSAMstrandField intronMotif --outFilterIntronMotifs RemoveNoncanonical --outSAMtype BAM SortedByCoordinate --genomeDir /media/sf_Ubuntu/Genomes/Generated_Genome_64_STAR_Zebrafish/ --outFileNamePrefix /media/sf_Ubuntu/DATA/STARoutput_BAMcoordinate/OT_2  --readFilesIn /media/sf_Ubuntu/DATA/OT_2_merged.fastq
+
+STAR --runThreadN 6 --runMode alignReads --outFilterMultimapNmax 1 --outSAMattrIHstart 0 --outSAMstrandField intronMotif --outFilterIntronMotifs RemoveNoncanonical --outSAMtype BAM SortedByCoordinate --genomeDir /media/sf_Ubuntu/Genomes/Generated_Genome_64_STAR_Zebrafish/ --outFileNamePrefix /media/sf_Ubuntu/DATA/STARoutput_BAMcoordinate/OT_3  --readFilesIn /media/sf_Ubuntu/DATA/OT_3_merged.fastq
+
+STAR --runThreadN 6 --runMode alignReads --outFilterMultimapNmax 1 --outSAMattrIHstart 0 --outSAMstrandField intronMotif --outFilterIntronMotifs RemoveNoncanonical --outSAMtype BAM SortedByCoordinate --genomeDir /media/sf_Ubuntu/Genomes/Generated_Genome_64_STAR_Zebrafish/ --outFileNamePrefix /media/sf_Ubuntu/DATA/STARoutput_BAMcoordinate/OT_4  --readFilesIn /media/sf_Ubuntu/DATA/OT_4_merged.fastq
+
+STAR --runThreadN 6 --runMode alignReads --outFilterMultimapNmax 1 --outSAMattrIHstart 0 --outSAMstrandField intronMotif --outFilterIntronMotifs RemoveNoncanonical --outSAMtype BAM SortedByCoordinate --genomeDir /media/sf_Ubuntu/Genomes/Generated_Genome_64_STAR_Zebrafish/ --outFileNamePrefix /media/sf_Ubuntu/DATA/STARoutput_BAMcoordinate/HB_1  --readFilesIn /media/sf_Ubuntu/DATA/HB_1_merged.fastq
+
+STAR --runThreadN 6 --runMode alignReads --outFilterMultimapNmax 1 --outSAMattrIHstart 0 --outSAMstrandField intronMotif --outFilterIntronMotifs RemoveNoncanonical --outSAMtype BAM SortedByCoordinate --genomeDir /media/sf_Ubuntu/Genomes/Generated_Genome_64_STAR_Zebrafish/ --outFileNamePrefix /media/sf_Ubuntu/DATA/STARoutput_BAMcoordinate/HB_2  --readFilesIn /media/sf_Ubuntu/DATA/HB_2_merged.fastq  
+
+STAR --runThreadN 6 --runMode alignReads --outFilterMultimapNmax 1 --outSAMattrIHstart 0 --outSAMstrandField intronMotif --outFilterIntronMotifs RemoveNoncanonical --outSAMtype BAM SortedByCoordinate --genomeDir /media/sf_Ubuntu/Genomes/Generated_Genome_64_STAR_Zebrafish/ --outFileNamePrefix /media/sf_Ubuntu/DATA/STARoutput_BAMcoordinate/HB_3  --readFilesIn /media/sf_Ubuntu/DATA/HB_3_merged.fastq    
+
+STAR --runThreadN 6 --runMode alignReads --outFilterMultimapNmax 1 --outSAMattrIHstart 0 --outSAMstrandField intronMotif --outFilterIntronMotifs RemoveNoncanonical --outSAMtype BAM SortedByCoordinate --genomeDir /media/sf_Ubuntu/Genomes/Generated_Genome_64_STAR_Zebrafish/ --outFileNamePrefix /media/sf_Ubuntu/DATA/STARoutput_BAMcoordinate/HB_4  --readFilesIn /media/sf_Ubuntu/DATA/HB_4_merged.fastq   
+  
+STAR --runThreadN 6 --runMode alignReads --outFilterMultimapNmax 1 --outSAMattrIHstart 0 --outSAMstrandField intronMotif --outFilterIntronMotifs RemoveNoncanonical --outSAMtype BAM SortedByCoordinate --genomeDir /media/sf_Ubuntu/Genomes/Generated_Genome_64_STAR_Zebrafish/ --outFileNamePrefix /media/sf_Ubuntu/DATA/STARoutput_BAMcoordinate/MB_1  --readFilesIn /media/sf_Ubuntu/DATA/MD_1_merged.fastq  
+
+STAR --runThreadN 6 --runMode alignReads --outFilterMultimapNmax 1 --outSAMattrIHstart 0 --outSAMstrandField intronMotif --outFilterIntronMotifs RemoveNoncanonical --outSAMtype BAM SortedByCoordinate --genomeDir /media/sf_Ubuntu/Genomes/Generated_Genome_64_STAR_Zebrafish/ --outFileNamePrefix /media/sf_Ubuntu/DATA/STARoutput_BAMcoordinate/MB_2  --readFilesIn /media/sf_Ubuntu/DATA/MD_2_merged.fastq 
+
+STAR --runThreadN 6 --runMode alignReads --outFilterMultimapNmax 1 --outSAMattrIHstart 0 --outSAMstrandField intronMotif --outFilterIntronMotifs RemoveNoncanonical --outSAMtype BAM SortedByCoordinate --genomeDir /media/sf_Ubuntu/Genomes/Generated_Genome_64_STAR_Zebrafish/ --outFileNamePrefix /media/sf_Ubuntu/DATA/STARoutput_BAMcoordinate/MB_3  --readFilesIn /media/sf_Ubuntu/DATA/MD_3_merged.fastq  
+
+STAR --runThreadN 6 --runMode alignReads --outFilterMultimapNmax 1 --outSAMattrIHstart 0 --outSAMstrandField intronMotif --outFilterIntronMotifs RemoveNoncanonical --outSAMtype BAM SortedByCoordinate --genomeDir /media/sf_Ubuntu/Genomes/Generated_Genome_64_STAR_Zebrafish/ --outFileNamePrefix /media/sf_Ubuntu/DATA/STARoutput_BAMcoordinate/MB_4  --readFilesIn /media/sf_Ubuntu/DATA/MD_4_merged.fastq  
+
+Run HTSeq for counting:
+htseq-count -f bam -r pos -s no -i gene_id /media/sf_Ubuntu/DATA/STARoutput_BAMcoordinate/Tel_1Aligned.sortedByCoord.out.bam /media/sf_Ubuntu/Genomes/Zebrafish_GTF_version_8_29_2019/Danio_rerio.GRCz11.98.gtf >> /media/sf_Ubuntu/DATA/Count_files_sorted/Tel1_count.txt
+
+htseq-count -f bam -r pos -s no -i gene_id /media/sf_Ubuntu/DATA/STARoutput_BAMcoordinate/Tel_2Aligned.sortedByCoord.out.bam /media/sf_Ubuntu/Genomes/Zebrafish_GTF_version_8_29_2019/Danio_rerio.GRCz11.98.gtf >> /media/sf_Ubuntu/DATA/Count_files_sorted/Tel2_count.txt
+
+htseq-count -f bam -r pos -s no -i gene_id /media/sf_Ubuntu/DATA/STARoutput_BAMcoordinate/Tel_3Aligned.sortedByCoord.out.bam /media/sf_Ubuntu/Genomes/Zebrafish_GTF_version_8_29_2019/Danio_rerio.GRCz11.98.gtf >> /media/sf_Ubuntu/DATA/Count_files_sorted/Tel3_count.txt
+
+htseq-count -f bam -r pos -s no -i gene_id /media/sf_Ubuntu/DATA/STARoutput_BAMcoordinate/Tel_4Aligned.sortedByCoord.out.bam /media/sf_Ubuntu/Genomes/Zebrafish_GTF_version_8_29_2019/Danio_rerio.GRCz11.98.gtf >> /media/sf_Ubuntu/DATA/Count_files_sorted/Tel4_count.txt
+
+htseq-count -f bam -r pos -s no -i gene_id /media/sf_Ubuntu/DATA/STARoutput_BAMcoordinate/OT_1Aligned.sortedByCoord.out.bam /media/sf_Ubuntu/Genomes/Zebrafish_GTF_version_8_29_2019/Danio_rerio.GRCz11.98.gtf >> /media/sf_Ubuntu/DATA/Count_files_sorted/OT_1_count.txt
+
+htseq-count -f bam -r pos -s no -i gene_id /media/sf_Ubuntu/DATA/STARoutput_BAMcoordinate/OT_2Aligned.sortedByCoord.out.bam /media/sf_Ubuntu/Genomes/Zebrafish_GTF_version_8_29_2019/Danio_rerio.GRCz11.98.gtf >> /media/sf_Ubuntu/DATA/Count_files_sorted/OT_2_count.txt
+
+htseq-count -f bam -r pos -s no -i gene_id /media/sf_Ubuntu/DATA/STARoutput_BAMcoordinate/OT_3Aligned.sortedByCoord.out.bam /media/sf_Ubuntu/Genomes/Zebrafish_GTF_version_8_29_2019/Danio_rerio.GRCz11.98.gtf >> /media/sf_Ubuntu/DATA/Count_files_sorted/OT_3_count.txt
+
+htseq-count -f bam -r pos -s no -i gene_id /media/sf_Ubuntu/DATA/STARoutput_BAMcoordinate/OT_4Aligned.sortedByCoord.out.bam /media/sf_Ubuntu/Genomes/Zebrafish_GTF_version_8_29_2019/Danio_rerio.GRCz11.98.gtf >> /media/sf_Ubuntu/DATA/Count_files_sorted/OT_4_count.txt
+
+htseq-count -f bam -r pos -s no -i gene_id /media/sf_Ubuntu/DATA/STARoutput_BAMcoordinate/HB_1Aligned.sortedByCoord.out.bam /media/sf_Ubuntu/Genomes/Zebrafish_GTF_version_8_29_2019/Danio_rerio.GRCz11.98.gtf >> /media/sf_Ubuntu/DATA/Count_files_sorted/HB_1_count.txt
+
+htseq-count -f bam -r pos -s no -i gene_id /media/sf_Ubuntu/DATA/STARoutput_BAMcoordinate/HB_2Aligned.sortedByCoord.out.bam /media/sf_Ubuntu/Genomes/Zebrafish_GTF_version_8_29_2019/Danio_rerio.GRCz11.98.gtf >> /media/sf_Ubuntu/DATA/Count_files_sorted/HB_2_count.txt
+
+htseq-count -f bam -r pos -s no -i gene_id /media/sf_Ubuntu/DATA/STARoutput_BAMcoordinate/HB_3Aligned.sortedByCoord.out.bam /media/sf_Ubuntu/Genomes/Zebrafish_GTF_version_8_29_2019/Danio_rerio.GRCz11.98.gtf >> /media/sf_Ubuntu/DATA/Count_files_sorted/HB_3_count.txt
+
+htseq-count -f bam -r pos -s no -i gene_id /media/sf_Ubuntu/DATA/STARoutput_BAMcoordinate/HB_4Aligned.sortedByCoord.out.bam /media/sf_Ubuntu/Genomes/Zebrafish_GTF_version_8_29_2019/Danio_rerio.GRCz11.98.gtf >> /media/sf_Ubuntu/DATA/Count_files_sorted/HB_4_count.txt
+
+htseq-count -f bam -r pos -s no -i gene_id /media/sf_Ubuntu/DATA/STARoutput_BAMcoordinate/MB_1Aligned.sortedByCoord.out.bam /media/sf_Ubuntu/Genomes/Zebrafish_GTF_version_8_29_2019/Danio_rerio.GRCz11.98.gtf >> /media/sf_Ubuntu/DATA/Count_files_sorted/MB_1_count.txt
+
+htseq-count -f bam -r pos -s no -i gene_id /media/sf_Ubuntu/DATA/STARoutput_BAMcoordinate/MB_2Aligned.sortedByCoord.out.bam /media/sf_Ubuntu/Genomes/Zebrafish_GTF_version_8_29_2019/Danio_rerio.GRCz11.98.gtf >> /media/sf_Ubuntu/DATA/Count_files_sorted/MB_2_count.txt
+
+htseq-count -f bam -r pos -s no -i gene_id /media/sf_Ubuntu/DATA/STARoutput_BAMcoordinate/MB_3Aligned.sortedByCoord.out.bam /media/sf_Ubuntu/Genomes/Zebrafish_GTF_version_8_29_2019/Danio_rerio.GRCz11.98.gtf >> /media/sf_Ubuntu/DATA/Count_files_sorted/MB_3_count.txt
+
+htseq-count -f bam -r pos -s no -i gene_id /media/sf_Ubuntu/DATA/STARoutput_BAMcoordinate/MB_4Aligned.sortedByCoord.out.bam /media/sf_Ubuntu/Genomes/Zebrafish_GTF_version_8_29_2019/Danio_rerio.GRCz11.98.gtf >> /media/sf_Ubuntu/DATA/Count_files_sorted/MB_4_count.txt
+

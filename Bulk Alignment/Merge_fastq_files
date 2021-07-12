@@ -1,0 +1,18 @@
+cat HB_1_S4_L001_R1_001.fastq.gz HB_1_S62_L008_R1_001.fastq.gz > HB_1_merged.fastq.gz
+cat HB_2_S66_L008_R1_001.fastq.gz HB_2_S8_L001_R1_001.fastq.gz > HB_2_merged.fastq.qz
+cat HB_3_S12_L001_R1_001.fastq.gz HB_3_S70_L008_R1_001.fastq.gz > HB_3_merged.fastq.qz
+cat HB_4_S16_L001_R1_001.fastq.gz HB_4_S74_L008_R1_001.fastq.gz > HB_4_merged.fastq.qz
+cat MD_1_S3_L001_R1_001.fastq.gz MD_1_S61_L008_R1_001.fastq.gz > MD_1_merged.fastq.qz
+cat MD_2_S65_L008_R1_001.fastq.gz MD_2_S7_L001_R1_001.fastq.gz > MD_2_merged.fastq.gz
+cat MD_3_S11_L001_R1_001.fastq.gz MD_3_S69_L008_R1_001.fastq.gz > MD_3_merged.fastq.gz
+cat MD_4_S15_L001_R1_001.fastq.gz MD_4_S73_L008_R1_001.fastq.gz > MD_4_merged.fastq.qz
+cat OT_1_S2_L001_R1_001.fastq.gz OT_1_S60_L008_R1_001.fastq.gz > OT_1_merged.fastq.gz
+cat OT_2_S64_L008_R1_001.fastq.gz OT_2_S6_L001_R1_001.fastq.gz > OT_2_merged.fastq.gz
+cat OT_3_S10_L001_R1_001.fastq.gz OT_3_S68_L008_R1_001.fastq.gz > OT_3_merged.fastq.gz
+cat OT_4_S14_L001_R1_001.fastq.gz OT_4_S72_L008_R1_001.fastq.gz > OT_4_merged.fastq.gz
+cat Tel_1_S1_L001_R1_001.fastq.gz Tel_1_S59_L008_R1_001.fastq.gz > Tel_1_merged.fastq.gz
+cat Tel_2_S5_L001_R1_001.fastq.gz Tel_2_S63_L008_R1_001.fastq.gz > Tel_2_merged.fastq.gz
+cat Tel_3_S67_L008_R1_001.fastq.gz Tel_3_S9_L001_R1_001.fastq.gz > Tel_3_merged.fastq.gz
+cat Tel_4_S13_L001_R1_001.fastq.gz Tel_4_S71_L008_R1_001.fastq.gz > Tel_4_merged.fastq.gz
+
+
