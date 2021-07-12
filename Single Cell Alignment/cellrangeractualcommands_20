@@ -1,0 +1,24 @@
+
+##cellranger count --id=NSMG20_1 --transcriptome=z11 --fastqs=~/../ubuntusc/Nickscrnaseq/NS_AVM_04/##NS_AVM_samples --sample=Sample1 --chemistry=SC3Pv3 --nosecondary && echo "1_yes_" >> didIwork.txt
+
+
+##cp -rf ~/../ubuntusc/Nickscrnaseq/NS_AVM_04/DataOuts/NSMG20_1 ~/../../media/sf_SharedFolder
+##rm -rf ~/../ubuntusc/Nickscrnaseq/NS_AVM_04/DataOuts/NSMG20_1
+
+##cellranger count --id=NSMG20_2 --transcriptome=z11 --fastqs=~/../ubuntusc/Nickscrnaseq/NS_AVM_04/##NS_AVM_samples --sample=Sample2 --chemistry=SC3Pv3 --nosecondary && echo "2b_yes_cellranger3.1.0" ##>> didIwork.txt
+
+
+##cp -rf ~/../ubuntusc/Nickscrnaseq/NS_AVM_04/DataOuts/NSMG20_2 ~/../../media/sf_SharedFolder
+##rm -rf ~/../ubuntusc/Nickscrnaseq/NS_AVM_04/DataOuts/NSMG20_2
+
+cellranger count --id=NSMG20_3 --transcriptome=z11 --fastqs=~/../ubuntusc/Nickscrnaseq/NS_AVM_04/NS_AVM_samples --sample=Sample3 --chemistry=SC3Pv3 --nosecondary && echo "2b_yes_cellranger3.1.0" >> didIwork.txt
+
+
+cp -rf ~/../ubuntusc/Nickscrnaseq/NS_AVM_04/DataOuts/NSMG20_3 ~/../../media/sf_SharedFolder
+rm -rf ~/../ubuntusc/Nickscrnaseq/NS_AVM_04/DataOuts/NSMG20_3
+
+cellranger count --id=NSMG20_4 --transcriptome=z11 --fastqs=~/../ubuntusc/Nickscrnaseq/NS_AVM_04/NS_AVM_samples --sample=Sample4 --chemistry=SC3Pv3 --nosecondary && echo "2b_yes_cellranger3.1.0" >> didIwork.txt
+
+
+cp -rf ~/../ubuntusc/Nickscrnaseq/NS_AVM_04/DataOuts/NSMG20_4 ~/../../media/sf_SharedFolder
+rm -rf ~/../ubuntusc/Nickscrnaseq/NS_AVM_04/DataOuts/NSMG20_4
